@@ -1,8 +1,9 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+<script type="text/javascript" src="webgl-utils.js"> </script>
 <script type="text/javascript">
+
     function getShader(gl, id) {
         var shaderScript = document.getElementById(id);
         if (!shaderScript) {
@@ -38,63 +39,121 @@
         return shader;
     }
 
-function WebGLStart() {
+var gl;
+var positionLocation;
+var colorLocation;
+
+function init() {
 	canvas = document.getElementById("lesson01-canvas");
         gl = canvas.getContext("experimental-webgl");
         gl.viewportWidth = canvas.width;
         gl.viewportHeight = canvas.height;
 
 
-	var vertexShader = getShader(gl, "2d-vertex-shader");
 	var fragmentShader = getShader(gl, "2d-fragment-shader");
+        var vertexShader = getShader(gl, "2d-vertex-shader");
 
-        program = gl.createProgram();
+        var program = gl.createProgram();
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            alert("Could not initialise shaders");
-        }
 	gl.useProgram(program);
 
-	var positionLocation = gl.getAttribLocation(program, "a_position");
+	positionLocation = gl.getAttribLocation(program, "a_position");
+        colorLocation = gl.getAttribLocation(program, "a_color");
+	gl.enable(gl.LINE_SMOOTH);
+	gl.lineWidth(30);
 
+        gl.viewport(0.0, 0.0, canvas.width, canvas.height);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.disable(gl.DEPTH_TEST);
+}
 
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+var i=0;
 
-	var vertices = [ -0.8, -0.8, 
-         0.5, -1.0, 
-        -1,  1.0];
-
-	triangleVertexPositionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
-        
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-        
-	triangleVertexPositionBuffer.itemSize = 2;
-        triangleVertexPositionBuffer.numItems = 3;
-
+function drawTrace(trace, color) {
+	n = trace.length;
+	var vertices = new Array(2*n);
+	var colors = new Array(4*n);
+	for(var i=0; i<n; ++i) 
+	{
+		vertices[2*i] = trace[i].x;
+		vertices[2*i+1] = trace[i].y;
+		colors[4*i]   = color.r;
+		colors[4*i+1] = color.g;
+		colors[4*i+2] = color.b;
+		colors[4*i+3] = color.a;
+	}
+	buffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+	gl.bufferData(gl.ARRAY_BUFFER, vertices);
+	buffer.itemSize = 2;
+	buffer.numItems = n;
+	gl.vertexAttrribPointer(positionLocatiom, 2, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(positionLocation);
-	gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-	gl.drawArrays(gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
+	
+	buffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+	gl.bufferData(gl.ARRAY_BUFFER, vertices);
+	buffer.itemSize = 4;
+	buffer.numItems = n;
+	gl.vertexAttrribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(colorLocation);
+	gl.drawArrays(gl.LINE_STRIP, 0, n);
+}
 
+function tick() {
+	requestAnimFrame(tick);
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	for(plr in players)
+		drawTrace(plr.trace, plr.color);
+}
 
+function color(r,g,b,a)
+{
+	this.r=r;
+	this.g=g;
+	this.b=b;
+	this.a=a;
+}
+
+function point(x,y)
+{
+	this.x=x;
+	this.y=y;
+};
+
+function player() {
+	this.trace = new Array(200);
+	for(var i=-100; i<100; ++i)
+	{
+		this.trace[i] = new point(i/100, Math.sin(4*i/100));
+	}
+	this.color = new color(1,0,0,0);
+}
+function WebGLStart() {
+	players = [ new player() ];
+	init();
+	tick();
 }
 </script>
 <script id="2d-vertex-shader" type="x-shader/x-vertex">
 attribute vec2 a_position;
+attribute vec4 a_color;
+varying vec4 v_color;
 
 void main() {
   gl_Position = vec4(a_position, 0, 1);
+  v_color = a_color;
 }
 </script>
 
 <script id="2d-fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+varying vec4 v_color;
 void main() {
-  gl_FragColor = vec4(0,1,0,1);  // green
+  gl_FragColor = v_color;
 }
 </script>
 </head>
