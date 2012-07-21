@@ -59,8 +59,8 @@ function init() {
         gl.linkProgram(program);
 	gl.useProgram(program);
 
-	positionLocation = gl.getAttribLocation(program, "a_position");
-        colorLocation = gl.getAttribLocation(program, "a_color");
+	gl.positionLocation = gl.getAttribLocation(program, "a_position");
+        gl.colorLocation = gl.getAttribLocation(program, "a_color");
 	gl.enable(gl.LINE_SMOOTH);
 	gl.lineWidth(30);
 
@@ -72,10 +72,10 @@ function init() {
 var i=0;
 
 function drawTrace(trace, color) {
-	n = trace.length;
+	var n = trace.length;
 	var vertices = new Array(2*n);
 	var colors = new Array(4*n);
-	for(var i=0; i<n; ++i) 
+	for(var i=0; i<n-5; ++i) 
 	{
 		vertices[2*i] = trace[i].x;
 		vertices[2*i+1] = trace[i].y;
@@ -86,28 +86,28 @@ function drawTrace(trace, color) {
 	}
 	buffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-	gl.bufferData(gl.ARRAY_BUFFER, vertices);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 	buffer.itemSize = 2;
 	buffer.numItems = n;
-	gl.vertexAttrribPointer(positionLocatiom, 2, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(positionLocation);
+	gl.vertexAttribPointer(gl.positionLocation, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(gl.positionLocation);
 
 	
 	buffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-	gl.bufferData(gl.ARRAY_BUFFER, vertices);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 	buffer.itemSize = 4;
 	buffer.numItems = n;
-	gl.vertexAttrribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(colorLocation);
+	gl.vertexAttribPointer(gl.colorLocation, 4, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(gl.colorLocation);
 	gl.drawArrays(gl.LINE_STRIP, 0, n);
 }
 
 function tick() {
 	requestAnimFrame(tick);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	for(plr in players)
-		drawTrace(plr.trace, plr.color);
+	for(var i = 0; i< players.length; ++i)
+		drawTrace(players[i].trace, players[i].color);
 }
 
 function color(r,g,b,a)
@@ -128,9 +128,9 @@ function player() {
 	this.trace = new Array(200);
 	for(var i=-100; i<100; ++i)
 	{
-		this.trace[i] = new point(i/100, Math.sin(4*i/100));
+		this.trace[i+100] = new point(i/100, Math.sin(4*i/100));
 	}
-	this.color = new color(1,0,0,0);
+	this.color = new color(1,0,0,1);
 }
 function WebGLStart() {
 	players = [ new player() ];
