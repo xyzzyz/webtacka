@@ -13,7 +13,7 @@ data Segment = Segment { first :: Point
                        , second :: Point
                        } deriving (Show, Eq)
 
-eps = 0.0001
+eps = 0
 
 check l1 l2 = if abs(l1) > eps && abs(l2) > eps then l1*l2 < 0
 	else False
