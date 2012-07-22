@@ -14,8 +14,8 @@ data Segment = Segment { first :: Point
 
 segIntersection :: Segment -> Segment -> Bool
 segIntersection (Segment (Point x1 y1) (Point x2 y2)) (Segment (Point x3 y3) (Point x4 y4)) =
-		((x1-x2)*(y3-y2)-(y1-y2)*(x3-x4))*((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2))<0 &&
-		((x1-x3)*(y4-y3)-(y1-y3)*(x4-x3))*((x2-x3)*(y4-y3)-(y2-y3)*(x4-x3))<0 
+		((x1-x2)*(y3-y2)-(y1-y2)*(x3-x4))*((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2))<=0 &&
+		((x1-x3)*(y4-y3)-(y1-y3)*(x4-x3))*((x2-x3)*(y4-y3)-(y2-y3)*(x4-x3))<=0 
 
 data Tree = Leaf [Segment] Rectangle | Node Tree Tree Tree Tree Rectangle deriving Show
 
@@ -33,15 +33,16 @@ segTreeIntersection s (Node t1 t2 t3 t4 r) =
 
 addSegment :: Tree -> Segment -> Tree
 addSegment (Leaf l r) s = if segRectIntersection s r then 
-				trace "Dodalem" (Leaf (s:l) r)
-			else trace "nie dodalem" (Leaf l r) 
-addSegment (Node t1 t2 t3 t4 r) s = trace "addSegment" (
+				(Leaf (s:l) r)
+			else (Leaf l r)
+
+addSegment (Node t1 t2 t3 t4 r) s =
 			if segRectIntersection s r then
-				(Node (addSegment t1 s) (addSegment t2 s) (addSegment t3 s) (addSegment t4 s) r)
-			else (Node t1 t2 t3 t4 r))
+			 	(Node (addSegment t1 s) (addSegment t2 s) (addSegment t3 s) (addSegment t4 s) r)
+			else (Node t1 t2 t3 t4 r)
 
 buildTree :: Rectangle -> Tree
-buildTree r = if ((right r) - (left r)) < 0.5 then trace "Test" (Leaf [] r)
+buildTree r = if ((right r) - (left r)) < 0.5 then (Leaf [] r)
 	      else (Node (leftTop r) (rightTop r) (leftDown r) (rightDown r) r)
 
 leftTop :: Rectangle -> Tree
@@ -70,7 +71,7 @@ segRectIntersection (seg @ (Segment f s)) (rect @ (Rectangle l r t d)) =
 	else let (s1, s2, s3, s4) = (rectToSegs rect) in ((segIntersection seg s1) || (segIntersection seg s2) || (segIntersection seg s3) || (segIntersection seg s4)) 
   	
 isPointInRect :: Point -> Rectangle -> Bool
-isPointInRect (Point x y) (Rectangle l r t d) = (x>l && x<r && y<t && y>d) 
+isPointInRect (Point x y) (Rectangle l r t d) = (x>=l && x<=r && y<=t && y>=d) 
 
 rectToSegs :: Rectangle -> (Segment, Segment, Segment, Segment)
 rectToSegs (Rectangle l r t d) =
