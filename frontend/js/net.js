@@ -41,7 +41,7 @@ $(function(){
                       prepare_game(e.data.people);
                     },
                     'game_started': function(e){
-                      start_game();
+                      game_started();
                     },
                 }
             });

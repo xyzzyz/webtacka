@@ -78,8 +78,9 @@ function prepare_game(users){
     WebGLPrepare(config.users);
 };
 
-//function start_game(){
-//}
+function game_started(){
+    WebGLStart();
+}
 
 function fail(err){
     ui_set_failure(err);
