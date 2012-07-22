@@ -365,7 +365,7 @@ player.prototype.addPoint = function(pnt, direction)
 }
 
 function WebGLPrepare(users) {
-	consol.log("Prepare!");
+	consol.log("Prepare! " + JSON.stringify(users));
 	animation = false;
 	players = new Array();
   	$.each(users, function(id, user){
