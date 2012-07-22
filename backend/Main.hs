@@ -160,7 +160,8 @@ data Room = Room {
   capacity :: Int,
   roomClients :: [String],
   isActive :: Bool,
-  collisionTree :: Tree
+  collisionTree :: Tree,
+  oldCollisionTree :: Tree
   }
 data ServerData = ServerData {
   roomCount :: Int,
@@ -172,14 +173,22 @@ data ServerData = ServerData {
 
 type ServerState = StateT ServerData IO
 
+initSegments :: [Segment]
+initSegments = [Segment (Point (-1.0) (-1.0)) (Point (-1.0) 1.0),
+                Segment (Point (-1.0) (-1.0)) (Point 1.0 (-1.0)),
+                Segment (Point (-1.0) 1.0) (Point 1.0 1.0),
+                Segment (Point 1.0 (-1.0)) (Point 1.0 1.0)]
+
+initTree :: Tree
+initTree = foldl addSegment (buildTree (Rectangle (-1.0) 1.0 1.0 (-1.0))) initSegments
+
 createRoom nick capacity = do
   e <- get
   let ServerData { roomCount = n,
                    rooms = rs,
                    clients = cs,
                    clientRooms = crs } = e
-  put $ e { rooms = Map.insert n (Room capacity [nick] False
-                                  (buildTree (Rectangle (-1.0) 1.0 1.0 (-1.0))))
+  put $ e { rooms = Map.insert n (Room capacity [nick] False initTree initTree)
                     rs,
             roomCount = n+1,
             clientRooms = Map.insert nick n crs}
@@ -245,7 +254,7 @@ updateClient nick client = do
   put $ e { clients = Map.insert nick client (clients e) }
 
 tickTime :: Int
-tickTime = 50
+tickTime = 30
 
 main :: IO ()
 main = withSocketsDo $ do
@@ -351,11 +360,15 @@ handleClientMessage Tick = do
 
 
 handleRoom :: (Int, Room) -> ServerState ()
-handleRoom (rId, r@(Room { roomClients = cs, collisionTree = tree })) = do
+handleRoom (rId, r@(Room { roomClients = cs,
+                           collisionTree = tree,
+                           oldCollisionTree = oldTree })) = do
   clients <- mapM getClient cs
   positions <- mapM adjustPosition (filter alive clients)
   sendToRoom r (GameTick positions)
-  where dphi = 0.6
+  Just r' <- getRoom rId
+  updateRoom rId (r' { oldCollisionTree = tree })
+  where dphi = 0.7
         dp = 0.3
         dt = (fromRational (fromIntegral tickTime / 1000) :: Float)
         adjustPosition (client @(Client { nick = n,
@@ -366,13 +379,16 @@ handleRoom (rId, r@(Room { roomClients = cs, collisionTree = tree })) = do
               x' = x + (sin phi) * dt * dp
               y' = y + (cos phi) * dt * dp
               segment = Segment (Point x y) (Point x' y')
-          if segTreeIntersection segment tree
-            then do
-            updateClient n (client { alive = False })
-            sendToRoom r (PlayerDead n)
-            else do updateRoom rId (r { collisionTree = addSegment tree segment})
-                    updateClient n (client { positions = (x', y'):pss,
-                                             direction = phi'})
+          case segTreeIntersection segment oldTree of
+            Just segment' -> do
+              updateClient n (client { alive = False })
+              lift (putStrLn ("intersection " ++ show segment ++ show segment'))
+              sendToRoom r (PlayerDead n)
+            Nothing -> do
+              Just r' <- getRoom rId
+              updateRoom rId (r' { collisionTree = addSegment (collisionTree r') segment})
+              updateClient n (client { positions = (x', y'):pss,
+                                       direction = phi'})
           return (n, x', y', phi')
           where mod2pi phi | phi < 0 = 2*pi - phi
                            | phi >= 2*pi = phi - 2*pi
