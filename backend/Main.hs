@@ -343,7 +343,12 @@ handleClientMessage (ClientStarts nickname) = do
 
 handleClientMessage (ClientContinues nickname) = do
   rId <- getClientRoom nickname
+  Just r <- getRoom rId
+  mapM_ resurrectClient (roomClients r)
   newGame rId
+  where resurrectClient nick = do
+          client <- getClient nick
+          updateClient nick (client { alive = True })
 
 handleClientMessage (ClientSetsDirection nick change) = do
   client <- getClient nick
@@ -460,7 +465,7 @@ clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick = do
   action <- atomically getMessage
   case action of
     Left server -> sendSink toNetworkSink . textData . encode . showJSON $ server
-    Right network -> handleNetworkMessage network
+    Right network -> (putStrLn (show network)) >> handleNetworkMessage network
   clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick
   where getMessage = (Left `fmap` readTChan fromServerChan)
                      `orElse` (Right `fmap` readTChan fromNetworkChan)
