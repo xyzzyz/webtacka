@@ -43,13 +43,19 @@ function ui_set_failure(stat){
 function ui_update_score_board_colors(people_colors){
 }
 
+function ui_set_user_color(nick, color1, color2){
+  config.users[nick].color1 = color1;
+  config.users[nick].color2 = color2;
+}
+
 function ui_render_score_board(people){
     $( "#screen_room_score_board" ).html(
         $.render.score_board(people)
     );
     $(".score_board_entry").each(function(index){
-      var color1 = $(this).attr('color1');
-      var color2 = $(this).attr('color2');
+      var nick = $(this).attr('nick');
+      var color1 = config.users[nick].color1;
+      var color2 = config.users[nick].color2;
       $(this).find(".user_color").css('background-image', 'linear-gradient(bottom, ' + color1 + ' 27%, ' + color2 + ' 64%)');
       $(this).find(".user_color").css('background-image', '-o-linear-gradient(bottom, ' + color1 + ' 27%, ' + color2 + ' 64%)');
       $(this).find(".user_color").css('background-image', '-moz-linear-gradient(bottom, ' + color1 + ' 27%, ' + color2 + ' 64%)');
