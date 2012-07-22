@@ -321,8 +321,10 @@ function player( pos, dir) {
 	this.color = new color(0,1,0,1);
 	this.position = pos;
 	this.direction = dir;
-	this.server_trace = [ new point(this.position.x, this.position.y)];
-	this.temp_trace = [ new point(this.position.x, this.position.y) ];
+	this.server_trace = new Array();
+	this.server_trace.push(new point(this.position.x, this.position.y));
+	this.server_trace.push(new point(this.position.x, this.position.y));
+	this.temp_trace = new Array();
 	this.leftTurn = false;
 	this.rightTurn = false;
 	this.min_hue = 0;
@@ -332,23 +334,23 @@ var dt = 0.3;
 var dphi = 0.6;
 
 player.prototype.step = function() {
+	this.position.x += time*Math.sin(this.direction)*dt;
+	this.position.y += time*Math.cos(this.direction)*dt;
 	if(this.leftTurn) {
 		this.direction -= time*Math.PI*dphi;
 	}
 	if(this.rightTurn) {
 		this.direction += time*Math.PI*dphi;
 	}
-	this.position.x += time*Math.sin(this.direction)*dt;
-	this.position.y += time*Math.cos(this.direction)*dt;
 	this.temp_trace.push(new point(this.position.x, this.position.y));
 }
 
 player.prototype.addPoint = function(pnt, direction)
 {
-	this.position = pnt;
+	this.position = new point(pnt.x, pnt.y);
 	this.direction = direction;
-	this.server_trace.push(pnt);
-	this.temp_trace.length = 0;
+	this.server_trace.push(new point(pnt.x, pnt.y));
+	this.temp_trace = new Array();
 }
 
 function WebGLPrepare(users) {
