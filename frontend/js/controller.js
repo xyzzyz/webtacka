@@ -79,7 +79,6 @@ function control_turn(direction){
 
 
 function prepare_game(users){
-    if(typeof(config.users) == "undefined"){
       var newusers = {};
       $.each(users, function(id, user){
         newusers[user.nick] = {
@@ -97,7 +96,6 @@ function prepare_game(users){
       });
       config.users = newusers;
       config.users_list = users;
-    }
     ui_prepare_game();
     ui_render_score_board(config.users_list);
     ui_show_screen("game");
