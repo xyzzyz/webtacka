@@ -117,3 +117,6 @@ function join_err(err){
     ui_show_error(err);
     logged_in();
 };
+function player_dead(nick){
+  kill(nick);
+}
