@@ -345,6 +345,7 @@ handleClientMessage (ClientContinues nickname) = do
   rId <- getClientRoom nickname
   Just r <- getRoom rId
   mapM_ resurrectClient (roomClients r)
+  updateRoom rId (r { collisionTree = initTree, oldCollisionTree = initTree })
   newGame rId
   where resurrectClient nick = do
           client <- getClient nick

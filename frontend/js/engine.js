@@ -288,7 +288,7 @@ function drawTrace(plr) {
 	if(animation)
 		gl.drawArrays(gl.LINE_STRIP, 0, n);
 	else 
-		gl.drawArrays(gl.LINE_STRIP, 0, n);
+		gl.drawArrays(gl.POINTS, 0, n);
 }
 
 function tick() {
