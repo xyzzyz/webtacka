@@ -365,8 +365,8 @@ player.prototype.addPoint = function(pnt, direction)
 }
 
 function WebGLPrepare(users) {
+	consol.log("Prepare!");
 	animation = false;
-	lastTick = d.getTime();
 	players = new Array();
   	$.each(users, function(id, user){
     		players[user.nick] = new player(new point(user.x, user.y), user.direction);
@@ -403,4 +403,6 @@ function Destroy() {
 
 function WebGLStart() {
 	animation = true;
+	d = new Date();
+	lastTick = d.getTime();
 }
