@@ -74,8 +74,8 @@ function prepare_game(users){
           y: user.y,
           direction: user.direction,
           score: 0,
-          color1: "#FFBD24",
-          color2: "#FFF700"
+          color1: "#FFFFFF",
+          color2: "#000000"
         };
         log(newusers[user.nick]);
         users[id] = newusers[user.nick];
@@ -87,6 +87,7 @@ function prepare_game(users){
     ui_render_score_board(config.users_list);
     ui_show_screen("game");
     WebGLPrepare(config.users);
+    ui_render_score_board(config.users_list);
 };
 
 function game_started(){
