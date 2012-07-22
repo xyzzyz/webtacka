@@ -32,6 +32,7 @@ data ClientMessage = ClientConnected String (TChan ServerMessage)
                    | ClientCreatesRoom String Int
                    | ClientJoinsRoom String Int
                    | ClientStarts String
+                   | ClientContinues String
                    | ClientSetsDirection String DirectionChange
                    | DeferredStart Int
                    | Tick
@@ -41,6 +42,7 @@ data ClientWireMessage = Hello String
                        | CreateRoom Int
                        | Join Int
                        | Start
+                       | Continue
                        | ClientMove DirectionChange
                        deriving (Show)
 
@@ -53,6 +55,7 @@ instance JSON ClientWireMessage where
       "create_room" -> CreateRoom `fmap` getIntFromData "capacity" dat
       "join" -> Join `fmap` getIntFromData "room" dat
       "start" -> Ok Start
+      "continue" -> Ok Start
       "client_move" -> ClientMove `fmap` getDirectionChangeFromData dat
       s -> fail ("unknown message type: " ++ s)
   showJSON = undefined -- we won't need it
@@ -336,6 +339,31 @@ handleClientMessage (ClientStarts nickname) = do
   Just r <- getRoom rId
   let nicks = roomClients r
   updateCapacity rId (length nicks)
+  newGame rId
+
+handleClientMessage (ClientContinues nickname) = do
+  rId <- getClientRoom nickname
+  newGame rId
+
+handleClientMessage (ClientSetsDirection nick change) = do
+  client <- getClient nick
+  updateClient nick (client { directionChange = change })
+
+
+handleClientMessage (DeferredStart id) = do
+  Just r <- getRoom id
+  sendToRoom r StartGame
+  setGameStatus id True
+
+handleClientMessage Tick = do
+  rooms <- rooms `fmap` get
+  let activeRooms = Map.toList (Map.filter isActive rooms)
+  mapM_ handleRoom activeRooms
+  return ()
+
+newGame rId = do
+  Just r <- getRoom rId
+  let nicks = roomClients r
   poss <- lift (replicateM (length nicks) randomPosition)
   positions <- zipWithM zipClientPos nicks poss
   sendToRoom r (Prepare positions)
@@ -353,22 +381,6 @@ handleClientMessage (ClientStarts nickname) = do
           updateClient nick (client { positions = (x, y):ps,
                                       direction = direction })
           return (nick, x, y, direction)
-
-handleClientMessage (ClientSetsDirection nick change) = do
-  client <- getClient nick
-  updateClient nick (client { directionChange = change })
-
-
-handleClientMessage (DeferredStart id) = do
-  Just r <- getRoom id
-  sendToRoom r StartGame
-  setGameStatus id True
-
-handleClientMessage Tick = do
-  rooms <- rooms `fmap` get
-  let activeRooms = Map.toList (Map.filter isActive rooms)
-  mapM_ handleRoom activeRooms
-  return ()
 
 
 handleRoom :: (Int, Room) -> ServerState ()
@@ -456,6 +468,7 @@ clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick = do
         handleNetworkMessage (CreateRoom capacity) = sendToServer toServerChan (ClientCreatesRoom nick capacity)
         handleNetworkMessage (Join id) = sendToServer toServerChan (ClientJoinsRoom nick id)
         handleNetworkMessage Start = sendToServer toServerChan (ClientStarts nick)
+        handleNetworkMessage Continue = sendToServer toServerChan (ClientContinues nick)
         handleNetworkMessage (ClientMove change) = sendToServer toServerChan (ClientSetsDirection nick change)
         handleNetworkMessage _ = return ()
 
