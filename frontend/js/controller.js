@@ -103,7 +103,7 @@ function prepare_game(users){
         config.users[user.nick].x = user.x;
         config.users[user.nick].y = user.y;
         config.users[user.nick].direction= user.direction;
-      }
+      });
     }
     ui_prepare_game();
     ui_render_score_board(config.users_list);
