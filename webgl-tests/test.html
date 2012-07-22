@@ -3,6 +3,7 @@
 <head>
 <script type="text/javascript" src="webgl-utils.js"> </script>
 <script type="text/javascript" src="jquery-1.7.2.js"> </script>
+<script type="text/javascript" src="glMatrix-0.9.5.min.js"> </script>
 <script type="text/javascript">
 
 
@@ -46,22 +47,28 @@ var positionLocation;
 var colorLocation;
 var lastTick;
 var i=0;
-var leftTurn=false;
-var rightTurn = false;
 
 function init() {
  	$('body').keydown(function(event) {
 		if(event.which == 37) {
-			leftTurn = true;
+			players['jaro'].leftTurn = true;
 		} else if(event.which == 39) {
-			rightTurn = true;
+			players['jaro'].rightTurn = true;
+		} else if(event.which == 65) {
+			players['Agnieszka'].leftTurn = true;
+		} else if(event.which == 83) {
+			players['Agnieszka'].rightTurn = true;
 		}
 	});
  	$('body').keyup(function(event) {
 		if(event.which == 37) {
-			leftTurn = false;
+			players['jaro'].leftTurn = false;
 		} else if(event.which == 39) {
-			rightTurn = false;
+			players['jaro'].rightTurn = false;
+		} else if(event.which == 65) {
+			players['Agnieszka'].leftTurn = false;
+		} else if(event.which == 83) {
+			players['Agnieszka'].rightTurn = false;
 		}
 	});
 
@@ -74,14 +81,33 @@ function init() {
 	var fragmentShader = getShader(gl, "2d-fragment-shader");
         var vertexShader = getShader(gl, "2d-vertex-shader");
 
-        var program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-	gl.useProgram(program);
+	gl.backgroundProgram = gl.createProgram();
+	gl.attachShader(gl.backgroundProgram, getShader(gl, "background-vertex-shader"));
+	gl.attachShader(gl.backgroundProgram, getShader(gl, "background-fragment-shader"));
+	gl.linkProgram(gl.backgroundProgram);
 
-	gl.positionLocation = gl.getAttribLocation(program, "a_position");
-        gl.colorLocation = gl.getAttribLocation(program, "a_color");
+        gl.program = gl.createProgram();
+        gl.attachShader(gl.program, vertexShader);
+        gl.attachShader(gl.program, fragmentShader);
+        gl.linkProgram(gl.program);
+	gl.useProgram(gl.program);
+
+
+	gl.positionLocation = gl.getAttribLocation(gl.program, "a_position");
+        gl.colorLocation = gl.getAttribLocation(gl.program, "a_color");
+	gl.matrixUniform = gl.getUniformLocation(gl.program, "uPMatrix");
+	var pmatrix = mat4.create();
+	mat4.identity(pmatrix);
+	if(canvas.width < canvas.height)
+	{
+		mat4.scale(pmatrix, [1, canvas.width/canvas.height, 1]);
+	}
+	else
+	{
+		mat4.scale(pmatrix, [canvas.height/canvas.width, 1, 1]);
+	}
+	gl.uniformMatrix4fv(gl.matrixUniform, false, pmatrix);
+
 	gl.enable(gl.LINE_SMOOTH);
 	gl.lineWidth(3);
 
@@ -90,6 +116,70 @@ function init() {
 	gl.disable(gl.DEPTH_TEST);
 	d = new Date();
 	lastTick = d.getTime();
+
+	initBackground();
+	gl.backgroundMatrix = gl.getUniformLocation(gl.backgroundProgram, "uPMatrix");
+	gl.uniformMatrix4fv(gl.backgroundMatrix, false, pmatrix);
+
+	gl.useProgram(gl.program);
+}
+var backgroundTexture;
+
+function handleLoadedTexture(texture) {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+}
+
+function initBackground() {
+	var vertices = [-1, -1, -1, 1, 1, -1, 1, 1];
+	var coords   = [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
+	gl.useProgram(gl.backgroundProgram);
+	gl.backgroundBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.backgroundBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+	gl.backgroundBuffer.itemSize = 2;
+	gl.backgroundBuffer.numItems = 4;
+	gl.backgroundPosLocation = gl.getAttribLocation(gl.backgroundProgram, "a_position");
+	gl.vertexAttribPointer(gl.backgroundPosLocation, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(gl.backgroundPosLocation);
+           backgroundTexture = gl.createTexture();
+           backgroundTexture.image = new Image();
+           backgroundTexture.image.onload = function() {
+           handleLoadedTexture(backgroundTexture);
+           tick();
+       }
+
+        backgroundTexture.image.src = "Seattle_pic.jpg";	
+	gl.coordsBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.coordsBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(coords), gl.STATIC_DRAW);
+	gl.coordsBuffer.itemSize = 2;
+	gl.coordsBuffer.numItems = 4;
+	gl.coordsLocation = gl.getAttribLocation(gl.backgroundProgram, "a_coords");
+	gl.vertexAttribPointer(gl.coordsLocation, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(gl.coordsLocation);
+	
+	gl.samplerUniform = gl.getUniformLocation(gl.backgroundProgram, "uSampler");
+}
+
+function drawBackground() {
+	gl.useProgram(gl.backgroundProgram);
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.backgroundBuffer);
+	gl.vertexAttribPointer(gl.positionLocation, 2, gl.FLOAT, false, 0, 0);
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.coordsBuffer);
+	gl.vertexAttribPointer(gl.coordsLocation, 2, gl.FLOAT, false, 0, 0);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
+        gl.uniform1i(gl.samplerUniform, 0);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+	gl.useProgram(gl.program);
+	gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 function hsv(h, s, v)
@@ -148,7 +238,9 @@ function drawTrace(plr) {
 	{
 		vertices[2*i] = plr.server_trace[i].x;
 		vertices[2*i+1] = plr.server_trace[i].y;
-		col = rgb(hsv2rgb(new hsv(i % 360, 1, 1)));
+		var hue = Math.sin(4*i/360)*(plr.max_hue - plr.min_hue)/2 + plr.min_hue;
+		
+		col = rgb(hsv2rgb(new hsv(hue, 1, 1)));
 		colors[4*i]   = col.r;
 		colors[4*i+1] = col.g;
 		colors[4*i+2] = col.b;
@@ -158,9 +250,11 @@ function drawTrace(plr) {
 	for(; i<n; ++i)
 	{
 		j = i - plr.server_trace.length;
-		vertices[2*i] = plr.temp_trace[j];
-		vertices[2*i+1] = plr.temp_trace[j];
-		col = rgb(hsv2rgb(new hsv(i % 360, 1, 1)));
+		vertices[2*i] = plr.temp_trace[j].x;
+		vertices[2*i+1] = plr.temp_trace[j].y;
+		var hue = Math.sin(4*i/360)*(plr.max_hue - plr.min_hue)/2 + plr.min_hue;
+		
+		col = rgb(hsv2rgb(new hsv(hue, 1, 1)));
 		colors[4*i]   = col.r;
 		colors[4*i+1] = col.g;
 		colors[4*i+2] = col.b;
@@ -193,9 +287,10 @@ function tick() {
 
 	requestAnimFrame(tick);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	for(var i = 0; i< players.length; ++i) {
-		players[i].step();
-		drawTrace(players[i]);
+	drawBackground();
+	for(var xplr in players) {
+		players[xplr].step();
+		drawTrace(players[xplr]);
 	}
 }
 
@@ -224,15 +319,19 @@ function player() {
 	this.direction = Math.random()*Math.PI*2;
 	this.server_trace = [ new point(this.position.x, this.position.y)];
 	this.temp_trace = [];
+	this.leftTurn = false;
+	this.rightTurn = false;
+	this.min_hue = 0;
+	this.max_hue = 360;
 }
 var dt = 0.3;
 var dphi = 0.6;
 
 player.prototype.step = function() {
-	if(leftTurn) {
+	if(this.leftTurn) {
 		this.direction -= time*Math.PI*dphi;
 	}
-	if(rightTurn) {
+	if(this.rightTurn) {
 		this.direction += time*Math.PI*dphi;
 	}
 	this.position.x += time*Math.sin(this.direction)*dt;
@@ -249,18 +348,41 @@ player.prototype.addPoint = function(pnt, direction)
 }
 
 function WebGLStart() {
-	players = [ new player() ];
+	players = new Array();
+	players['jaro'] =  new player();
+	players['Agnieszka'] = new player();
+	var plrcnt = 0;
+	for(xplr in players){
+		plrcnt++;
+	}
+	if(plrcnt < 4){
+		var ah=0;
+		for(xplr in players) {
+			players[xplr].min_hue = ah;
+			players[xplr].max_hue = ah + 180/plrcnt;
+			ah += 360/plrcnt;
+		}
+	} else {
+		var ah=0;
+		for(xplr in players) {
+			players[xplr].min_hue = ah;
+			players[xplr].max_hue = ah;
+			ah += 360/plrcnt;
+		}
+	}
+
 	init();
-	tick();
+	
 }
 </script>
 <script id="2d-vertex-shader" type="x-shader/x-vertex">
 attribute vec2 a_position;
 attribute vec4 a_color;
+uniform mat4 uPMatrix;
 varying vec4 v_color;
 
 void main() {
-  gl_Position = vec4(a_position, 0, 1);
+  gl_Position = uPMatrix*vec4(a_position, 0, 1);
   v_color = a_color;
 }
 </script>
@@ -272,8 +394,36 @@ void main() {
   gl_FragColor = v_color;
 }
 </script>
+
+<script id="background-vertex-shader" type="x-shader/x-vertex">
+  attribute vec2 a_position;
+  attribute vec2 a_coords;
+
+  uniform mat4 uPMatrix;
+
+  varying vec2 vTextureCoord;
+
+  void main(void) {
+    gl_Position = uPMatrix * vec4(a_position, 0.0, 1.0);
+    vTextureCoord = a_coords;
+  }
+</script>
+
+<script id="background-fragment-shader" type="x-shader/x-fragment">
+  precision mediump float;
+
+  varying vec2 vTextureCoord;
+
+  uniform sampler2D uSampler;
+
+  void main(void) {
+     gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+ //   gl_FragColor = vec4(vTextureCoord.s, vTextureCoord.t, 1.0, 1.0);
+  }
+</script>
 </head>
 <body onload="WebGLStart()">
-<canvas id="lesson01-canvas" style="border: none;" width="500" height="500"></canvas>
+<canvas id="lesson01-canvas" style="border: none;" width="1000" height="500"></canvas>
+<img src="Seattle_pic.jpg" id="test"> </img>
 </body>
 </html>

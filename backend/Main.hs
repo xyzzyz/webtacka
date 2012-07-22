@@ -22,20 +22,38 @@ instance WebSocketsData String where
   fromLazyByteString = B.unpack
   toLazyByteString = B.pack
 
-data ClientMessage = ConnectMessage String (TChan ServerMessage)
-data ClientWireMessage = HelloMessage String
+data ClientMessage = ClientConnected String (TChan ServerMessage)
+                   | ClientAsksForRooms String
+                   | ClientCreatesRoom String Int
+data ClientWireMessage = Hello String
+                       | GetRooms
+                       | CreateRoom Int
 
 instance JSON ClientWireMessage where
   readJSON (JSObject obj) = do
     (typ, dat) <- getMessageTypeAndData (fromJSObject obj)
     case typ of
-      "hello" -> HelloMessage `fmap` getStringFromData "nick" dat
+      "hello" -> Hello `fmap` getStringFromData "nick" dat
+      "get_rooms" -> Ok GetRooms
+      "create_room" -> CreateRoom `fmap` getIntFromData "capacity" dat
+      s -> fail ("unknown message type: " ++ s)
   showJSON = undefined -- we won't need it
 
-getStringFromData key dat = case lookup key dat of
-  Just (JSString dat) -> return (fromJSString dat)
-  Just _ -> fail "expected string"
-  _ -> fail "key not found"
+getFromData key dat =  case lookup key dat of
+  Just dat -> return dat
+  Nothing -> fail ("key not found: " ++ key)
+
+getStringFromData key dat = do
+  dat <- getFromData key dat
+  case dat of
+    JSString s -> return (fromJSString s)
+    _ -> fail "expected string"
+
+getIntFromData key dat = do
+  dat <- getFromData key dat
+  case dat of
+    JSRational _ r -> return (floor r)
+    _ -> fail "expected int"
 
 getMessageTypeAndData obj = case (lookup "type" obj, lookup "data" obj) of
   (Just (JSString jstyp), Just (JSObject obj)) ->
@@ -48,19 +66,27 @@ wireMessageFromString str = decode str >>= readJSON
 
 data ServerMessage = LoggedIn
                    | LoginErr String
+                   | RoomsInfo [(Int, Int, [String])]
+                   | Joined Int Bool
 
-makeJSONPacket :: String -> JSValue -> JSValue
+makeJSONPacket :: String -> [(String, JSValue)] -> JSValue
 makeJSONPacket typ dat = JSObject $ toJSObject [("type", JSString $ toJSString typ),
-                                                ("data", dat)]
+                                                ("data", JSObject $ toJSObject dat)]
+
 
 makeEmptyJSONPacket :: String -> JSValue
-makeEmptyJSONPacket typ = makeJSONPacket typ (JSObject $ toJSObject [])
+makeEmptyJSONPacket typ = makeJSONPacket typ []
 
 instance JSON ServerMessage where
   showJSON LoggedIn = makeEmptyJSONPacket "logged_in"
-  showJSON (LoginErr str) = makeJSONPacket "login_err"
-                            (JSObject $ toJSObject [("msg", JSString $ toJSString str)])
-
+  showJSON (LoginErr str) = makeJSONPacket "login_err" [("error", JSString $ toJSString str)]
+  showJSON (RoomsInfo rooms) = makeJSONPacket "room_list" [("rooms", JSArray $ map roomToJSON rooms)]
+    where roomToJSON (id, capacity, nicks) =
+            JSObject $ toJSObject [("id", JSRational False (fromIntegral id)),
+                                   ("capacity", JSRational False (fromIntegral capacity)),
+                                   ("nicks", JSArray $ map (JSString . toJSString) nicks)]
+  showJSON (Joined id isOwner) = makeJSONPacket "joined" [("id", JSRational False (fromIntegral id)),
+                                                          ("owner", JSBool isOwner)]
   readJSON = undefined -- we won't need this
 
 data Client = Client {
@@ -68,18 +94,31 @@ data Client = Client {
   chan :: TChan ServerMessage
 }
 
-type Room = [Client]
+type Room = (Int, [Client])
 data ServerData = ServerData {
+  roomCount :: Int,
   rooms :: Map.Map Int Room,
   clients :: Map.Map String Client
 }
 
+getRoomsInfo :: ServerState [(Int, Int, [String])]
+getRoomsInfo = (map prepareInfo . Map.toList . rooms) `fmap` get
+  where prepareInfo (id, (capacity, clients)) = (id, capacity, map nick clients)
+
 getClients :: ServerState (Map.Map String Client)
-getClients = do
-  e <- get
-  return $ clients e
+getClients = clients `fmap` get
 
 hasClient nick = Map.member nick `fmap` getClients
+
+getClientChan nick = (chan . (Map.! nick)) `fmap` getClients
+
+createRoom nick capacity = do
+  e <- get
+  let ServerData { roomCount = n,
+                   rooms = rs,
+                   clients = cs } = e
+  put $ e { rooms = Map.insert n (capacity, [cs Map.! nick]) rs, roomCount = n+1 }
+  return n
 
 type ServerState = StateT ServerData IO
 atomicallyState = liftIO . atomically
@@ -89,7 +128,7 @@ main = withSocketsDo $ do
   servSock <- listenOn $ PortNumber 9160
   chan <- atomically newTChan
   forkIO $ acceptLoop servSock chan
-  evalStateT (mainLoop chan) (ServerData Map.empty Map.empty)
+  evalStateT (mainLoop chan) (ServerData 0 Map.empty Map.empty)
 
 acceptLoop :: Socket -> TChan ClientMessage -> IO ()
 acceptLoop serverSock chan = do
@@ -103,7 +142,7 @@ mainLoop chan = do
   handleClientMessage msg
   mainLoop chan
 
-handleClientMessage (ConnectMessage nick clientChan) = do
+handleClientMessage (ClientConnected nick clientChan) = do
   nickTaken <- hasClient nick
   if not nickTaken
     then addClient nick clientChan
@@ -113,7 +152,15 @@ handleClientMessage (ConnectMessage nick clientChan) = do
             put $ e { clients = Map.insert nick (Client nick clientChan) (clients e) }
             atomicallyState $ writeTChan clientChan LoggedIn
 
+handleClientMessage (ClientAsksForRooms nick) = do
+  c <- getClientChan nick
+  rooms <- getRoomsInfo
+  atomicallyState $ writeTChan c (RoomsInfo rooms)
 
+handleClientMessage (ClientCreatesRoom nick capacity) = do
+  n <- createRoom nick capacity
+  c <- getClientChan nick
+  atomicallyState $ writeTChan c (Joined n True)
 
 newClient :: TChan ClientMessage -> Request -> WebSockets Hybi10 ()
 newClient chan rq = do
@@ -121,21 +168,38 @@ newClient chan rq = do
   acceptRequest rq
   msg <- (receiveData :: WebSockets Hybi10 String)
   case wireMessageFromString msg of
-    Ok (HelloMessage nick) -> handleHelloMessage nick
+    Ok (Hello nick) -> handleHelloMessage nick
     Error str -> liftIO $ putStrLn ("JSON error: " ++ str)
     _ -> liftIO $ putStrLn ("Unexpected message")
   return ()
   where handleHelloMessage nick = do
           clientChan <- liftIO . atomically $ newTChan
+          networkChan <- liftIO . atomically $ newTChan
+          sink <- getSink
           liftIO $ putStrLn (nick ++ " connected")
-          liftIO . atomically $ writeTChan chan (ConnectMessage nick clientChan)
-          clientLoop chan clientChan
+          liftIO . atomically $ writeTChan chan (ClientConnected nick clientChan)
+          liftIO $ forkIO $ clientLoop clientChan chan networkChan sink nick
+          clientNetworkLoop networkChan
 
-clientLoop :: TChan ClientMessage -> TChan ServerMessage -> WebSockets Hybi10 ()
-clientLoop serverChan clientChan = do
-  msg <- liftIO . atomically $ readTChan clientChan
-  handleServerMsg msg
+clientLoop :: TChan ServerMessage
+              -> TChan ClientMessage
+              -> TChan ClientWireMessage
+              -> Sink Hybi10 -> String -> IO ()
+clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick = do
+  action <- atomically getMessage
+  case action of
+    Left server -> sendSink toNetworkSink . textData . encode . showJSON $ server
+    Right network -> handleNetworkMessage network
+  clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick
+  where getMessage = (Left `fmap` readTChan fromServerChan)
+                     `orElse` (Right `fmap` readTChan fromNetworkChan)
+        handleNetworkMessage GetRooms = atomically $ writeTChan toServerChan (ClientAsksForRooms nick)
+        handleNetworkMessage (CreateRoom capacity) = atomically $ writeTChan toServerChan (ClientCreatesRoom nick capacity)
+        handleNetworkMessage _ = return ()
 
-handleServerMsg msg = do
-  send $ textData (encode msg)
-
+clientNetworkLoop networkChan = do
+  msg <- (receiveData :: WebSockets Hybi10 String)
+  case wireMessageFromString msg of
+    Ok wireMessage -> liftIO $ atomically $ writeTChan networkChan wireMessage
+    Error str -> liftIO $ putStrLn ("JSON error: " ++ str)
+  clientNetworkLoop networkChan
