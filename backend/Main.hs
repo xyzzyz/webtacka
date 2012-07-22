@@ -74,6 +74,7 @@ getDirectionChangeFromData dat = do
   case c of
     "left" -> return ChangeLeft
     "right" -> return ChangeRight
+    "none" -> return None
     _ -> fail "wrong direction"
 
 getMessageTypeAndData obj = case (lookup "type" obj, lookup "data" obj) of
@@ -231,7 +232,7 @@ updateClient nick client = do
   put $ e { clients = Map.insert nick client (clients e) }
 
 tickTime :: Int
-tickTime = 50
+tickTime = 100
 
 main :: IO ()
 main = withSocketsDo $ do
