@@ -26,16 +26,22 @@ segIntersection (Segment (Point x1 y1) (Point x2 y2)) (Segment (Point x3 y3) (Po
 
 data Tree = Leaf [Segment] Rectangle | Node Tree Tree Tree Tree Rectangle deriving Show
 
-segTreeIntersection :: Segment -> Tree -> Bool
-segTreeIntersection s (Leaf [] r) = False
+anny :: [Maybe a] -> Maybe a
+anny [] = Nothing
+anny ((Just x):_) = Just x
+anny (Nothing:t) = anny t
+
+segTreeIntersection :: Segment -> Tree -> Maybe Segment
+segTreeIntersection s (Leaf [] r) = Nothing
 segTreeIntersection s (Leaf (l:ls) r) =
    			if (segRectIntersection s r) then  
-				(segIntersection s l) || (segTreeIntersection s (Leaf ls r))
-			else False
+				(if (segIntersection s l) then Just l
+				else segTreeIntersection s (Leaf ls r))
+			else Nothing
 segTreeIntersection s (Node t1 t2 t3 t4 r) = 
 			if (segRectIntersection s r) then
-				(segTreeIntersection s t1) || (segTreeIntersection s t2) || (segTreeIntersection s t3) || (segTreeIntersection s t4)
-			else False
+				anny [(segTreeIntersection s t1),(segTreeIntersection s t2), (segTreeIntersection s t3), (segTreeIntersection s t4)]
+			else Nothing
 
 
 addSegment :: Tree -> Segment -> Tree
