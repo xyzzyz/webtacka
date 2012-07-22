@@ -1,3 +1,4 @@
+var players;
     function getShader(gl, id) {
         var shaderScript = document.getElementById(id);
         if (!shaderScript) {
@@ -42,24 +43,15 @@ var i=0;
 function init() {
 	$('body').keydown(function(event) {
 		if(event.which == 37) {
-			players['jaro'].leftTurn = true;
+			players[config.nick].leftTurn = true;
 		} else if(event.which == 39) {
-			players['jaro'].rightTurn = true;
-		} else if(event.which == 65) {
-			players['Agnieszka'].leftTurn = true;
-		} else if(event.which == 83) {
-			players['Agnieszka'].rightTurn = true;
-		}
-	});
+			players[config.nick].rightTurn = true;
+		}	});
 	$('body').keyup(function(event) {
 		if(event.which == 37) {
-			players['jaro'].leftTurn = false;
+			players[config.nick].leftTurn = false;
 		} else if(event.which == 39) {
-			players['jaro'].rightTurn = false;
-		} else if(event.which == 65) {
-			players['Agnieszka'].leftTurn = false;
-		} else if(event.which == 83) {
-			players['Agnieszka'].rightTurn = false;
+			players[config.nick].rightTurn = false;
 		}
 	});
 
@@ -338,10 +330,11 @@ player.prototype.addPoint = function(pnt, direction)
 	this.temp_trace.length = 0;
 }
 
-function WebGLStart() {
+function WebGLPrepare(users) {
 	players = new Array();
-	players['jaro'] =  new player();
-	players['Agnieszka'] = new player();
+  $.each(users, function(id, user){
+    players[user.nick] = new player();
+  });
 	var plrcnt = 0;
 	for(xplr in players){
 		plrcnt++;
@@ -363,5 +356,4 @@ function WebGLStart() {
 	}
 
 	init();
-	
 }
