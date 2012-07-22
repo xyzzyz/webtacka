@@ -100,6 +100,7 @@ data ServerMessage = LoggedIn
                    | StartGame
                    | GameTick [(String, Float, Float, Float)]
                    | PlayerDead String [(String, Int)]
+                   | EndGame
 
 makeJSONPacket :: String -> [(String, JSValue)] -> JSValue
 makeJSONPacket typ dat = JSObject $ toJSObject [("type", JSString $ toJSString typ),
@@ -133,6 +134,7 @@ instance JSON ServerMessage where
                                 ("scoreboard", JSArray $ map makeScore scoreBoard)]
     where makeScore (nick, s) = JSObject $ toJSObject [("nick", JSString $ toJSString nick),
                                                        ("score", JSRational False (fromIntegral s))]
+  showJSON EndGame = makeEmptyJSONPacket "game_ended"
   readJSON = undefined -- we won't need this
 
 type Position = (Float, Float)
@@ -219,11 +221,11 @@ updateCapacity id capacity = do
       r = rs Map.! id
   put $ e { rooms = Map.insert id (r { capacity = capacity }) rs }
 
-setGameActive id = do
+setGameStatus id act  = do
   e <- get
   let rs = rooms e
       r = rs Map.! id
-  put $ e { rooms = Map.insert id (r { isActive = True }) rs }
+  put $ e { rooms = Map.insert id (r { isActive = act }) rs }
 
 
 atomicallyState :: STM a -> ServerState a
@@ -360,7 +362,7 @@ handleClientMessage (ClientSetsDirection nick change) = do
 handleClientMessage (DeferredStart id) = do
   Just r <- getRoom id
   sendToRoom r StartGame
-  setGameActive id
+  setGameStatus id True
 
 handleClientMessage Tick = do
   rooms <- rooms `fmap` get
@@ -378,6 +380,10 @@ handleRoom (rId, r@(Room { roomClients = cs,
   sendToRoom r (GameTick positions)
   Just r' <- getRoom rId
   updateRoom rId (r' { oldCollisionTree = tree })
+  newClients <- mapM getClient cs
+  when (length (filter alive clients) < 2) $ do
+    setGameStatus rId False
+    sendToRoom r' EndGame
   where dphi = 0.9
         dp = 0.3
         dt = (fromRational (fromIntegral tickTime / 1000) :: Float)
