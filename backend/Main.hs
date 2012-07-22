@@ -368,7 +368,7 @@ handleRoom (rId, r@(Room { roomClients = cs,
   sendToRoom r (GameTick positions)
   Just r' <- getRoom rId
   updateRoom rId (r' { oldCollisionTree = tree })
-  where dphi = 0.6
+  where dphi = 0.7
         dp = 0.3
         dt = (fromRational (fromIntegral tickTime / 1000) :: Float)
         adjustPosition (client @(Client { nick = n,
@@ -379,14 +379,16 @@ handleRoom (rId, r@(Room { roomClients = cs,
               x' = x + (sin phi) * dt * dp
               y' = y + (cos phi) * dt * dp
               segment = Segment (Point x y) (Point x' y')
-          if segTreeIntersection segment oldTree
-            then do
-            updateClient n (client { alive = False })
-            sendToRoom r (PlayerDead n)
-            else do Just r' <- getRoom rId
-                    updateRoom rId (r' { collisionTree = addSegment (collisionTree r') segment})
-                    updateClient n (client { positions = (x', y'):pss,
-                                             direction = phi'})
+          case segTreeIntersection segment oldTree of
+            Just segment' -> do
+              updateClient n (client { alive = False })
+              lift (putStrLn ("intersection " ++ show segment ++ show segment'))
+              sendToRoom r (PlayerDead n)
+            Nothing -> do
+              Just r' <- getRoom rId
+              updateRoom rId (r' { collisionTree = addSegment (collisionTree r') segment})
+              updateClient n (client { positions = (x', y'):pss,
+                                       direction = phi'})
           return (n, x', y', phi')
           where mod2pi phi | phi < 0 = 2*pi - phi
                            | phi >= 2*pi = phi - 2*pi
