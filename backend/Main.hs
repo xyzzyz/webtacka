@@ -152,7 +152,8 @@ data Client = Client {
   positions :: [Position],
   direction :: Float,
   directionChange :: DirectionChange,
-  alive :: Bool
+  alive :: Bool,
+  score :: Int
 }
 
 data Room = Room {
@@ -288,7 +289,7 @@ handleClientMessage (ClientConnected nick clientChan) = do
     else sendToClient clientChan (LoginErr "nick already exists")
     where addClient nick clientChan = do
             e <- get
-            put $ e { clients = Map.insert nick (Client nick clientChan [] 0.0 None True) (clients e) }
+            put $ e { clients = Map.insert nick (Client nick clientChan [] 0.0 None True 0) (clients e) }
             sendToClient clientChan LoggedIn
 
 handleClientMessage (ClientAsksForRooms nick) = do
