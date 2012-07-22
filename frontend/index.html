@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <title>Webtacka!</title>
-    <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap.dark.min.css" />
     <script src="http://www.google.com/jsapi"></script>
     <script>google.load("jquery", "1.7")</script>
     <script src="bootstrap/js/bootstrap.min.js"></script>
@@ -17,7 +17,7 @@
 
     <script type="text/javascript">
         var config = {
-            server_url: "ws://siema.qwpx.net:9160",
+            server_url: "ws://webtacka.net:9160",
         };
     </script>
     <script type="text/javascript" src="js/webgl-utils.js"> </script>
@@ -92,10 +92,11 @@ void main() {
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </a>
-          <a class="brand" href="#">Webtacka</a>
+          <a class="brand" href="/">Webtacka</a>
           <div class="nav-collapse">
             <ul class="nav">
               <li class="active"><a href="#">Home</a></li>
+              <li><a href="#" id="about_btn">About</a></li>
             </ul>
           </div><!--/.nav-collapse -->
         </div>
@@ -167,7 +168,7 @@ void main() {
     <div id="screen_game" style="display:none;">
       <div class="row-fluid">
         <div class="well span8">
-            <canvas id="lesson01-canvas" style="border: none;" width="1000" height="500"></canvas>
+            <canvas id="lesson01-canvas" style="border: none;" width="580" height="500"></canvas>
         </div>
         <div class="well span4">
           <script id="score_board_template" type="text/x-jsrender">
@@ -188,5 +189,17 @@ void main() {
   </div>
 
 </div>
+<div class="modal hide" id="about_modal">
+    <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal">×</button>
+    <h3>Webtacka version 0.1</h3>
+    </div>
+    <div class="modal-body">
+    <p>copyright (c) 2012 by Aga Szefer, Jarosław Błasiok, Adam Michalik &amp; Mateusz Kwapich</p>
+    </div>
+    <div class="modal-footer">
+    <a href="#" class="btn btn-primary" data-dismiss="modal">Close</a>
+    </div>
+    </div>
 </html>
 
