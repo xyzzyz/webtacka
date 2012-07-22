@@ -51,14 +51,18 @@ function initGL() {
 	$('body').keydown(function(event) {
 		if(event.which == 37) {
 			players[config.nick].leftTurn = true;
+      control_turn('left');
 		} else if(event.which == 39) {
 			players[config.nick].rightTurn = true;
+      control_turn('right');
 		}	});
 	$('body').keyup(function(event) {
 		if(event.which == 37) {
 			players[config.nick].leftTurn = false;
+      control_turn('none');
 		} else if(event.which == 39) {
 			players[config.nick].rightTurn = false;
+      control_turn('none');
 		}
 	});
 
@@ -330,11 +334,9 @@ var dphi = 0.6;
 player.prototype.step = function() {
 	if(this.leftTurn) {
 		this.direction -= time*Math.PI*dphi;
-    control_turn('left');
 	}
 	if(this.rightTurn) {
 		this.direction += time*Math.PI*dphi;
-    control_turn('right');
 	}
 	this.position.x += time*Math.sin(this.direction)*dt;
 	this.position.y += time*Math.cos(this.direction)*dt;
