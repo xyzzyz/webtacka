@@ -366,6 +366,7 @@ player.prototype.addPoint = function(pnt, direction)
 
 function WebGLPrepare(users) {
 	animation = false;
+	lastTick = d.getTime();
 	players = new Array();
   	$.each(users, function(id, user){
     		players[user.nick] = new player(new point(user.x, user.y), user.direction);
