@@ -411,7 +411,7 @@ handleRoom (rId, r@(Room { roomClients = cs,
 
 
 startGame rId serverChan = do
-  threadDelay 3*1000*1000
+  threadDelay (3*1000*1000)
   atomically $ writeTChan serverChan (DeferredStart rId)
   return ()
 
