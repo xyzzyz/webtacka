@@ -127,14 +127,32 @@ newClient chan rq = do
   return ()
   where handleHelloMessage nick = do
           clientChan <- liftIO . atomically $ newTChan
+          networkChan <- liftIO . atomically $ newTChan
+          sink <- getSink
           liftIO $ putStrLn (nick ++ " connected")
           liftIO . atomically $ writeTChan chan (ConnectMessage nick clientChan)
-          clientLoop chan clientChan
+          liftIO $ forkIO $ clientLoop clientChan chan networkChan sink
+          clientNetworkLoop networkChan
 
-clientLoop :: TChan ClientMessage -> TChan ServerMessage -> WebSockets Hybi10 ()
-clientLoop serverChan clientChan = do
-  msg <- liftIO . atomically $ readTChan clientChan
-  handleServerMsg msg
+clientLoop :: TChan ServerMessage
+              -> TChan ClientMessage
+              -> TChan ClientWireMessage
+              -> Sink Hybi10  -> IO ()
+clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink = do
+  action <- atomically getMessage
+  case action of
+    Left server -> sendSink toNetworkSink . textData . encode . showJSON $ server
+    Right network -> return ()
+  clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink
+  where getMessage = (Left `fmap` readTChan fromServerChan)
+                     `orElse` (Right `fmap` readTChan fromNetworkChan)
+
+clientNetworkLoop networkChan = do
+  msg <- (receiveData :: WebSockets Hybi10 String)
+  case wireMessageFromString msg of
+    Ok wireMessage -> liftIO $ atomically $ writeTChan networkChan wireMessage
+    Error str -> liftIO $ putStrLn ("JSON error: " ++ str)
+  clientNetworkLoop networkChan
 
 handleServerMsg msg = do
   send $ textData (encode msg)
