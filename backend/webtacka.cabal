@@ -9,6 +9,7 @@ Cabal-Version:       >=1.2
 
 Executable Main
   Main-is:           Main.hs
-  Build-Depends:     base, containers, mtl, transformers
+  Build-Depends:     base, containers, text, mtl, transformers,
+                     network, websockets, stm, json, bytestring
 
 
