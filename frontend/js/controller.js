@@ -93,6 +93,7 @@ function prepare_game(users){
       config.users = newusers;
       config.users_list = users;
     }
+    ui_prepare_game();
     ui_render_score_board(config.users_list);
     ui_show_screen("game");
     WebGLPrepare(config.users);

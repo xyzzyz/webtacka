@@ -82,6 +82,11 @@ function ui_show_end_game() {
     $("#screen_game_play_again_btn").show();
   }
 }
+function ui_prepare_game() {
+  $("#lesson01-canvas").show();
+  $("#screen_game_play_again_btn").hide();
+  $("#screen_game_end").hide();
+}
 
 function ui_show_about() {
   $('#about_modal').modal();
