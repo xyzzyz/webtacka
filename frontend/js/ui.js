@@ -93,7 +93,6 @@ $(function() {
     $("#about_btn").click(ui_show_about);
 
 
-
     $('#nick').keypress(function(e){
       if(e.which == 13){
        $('#hello').click();
