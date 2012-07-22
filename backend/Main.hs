@@ -3,6 +3,7 @@ module Main where
 
 import Text.JSON
 import Data.String
+import Data.Maybe
 import qualified Data.Map as Map
 import Network (listenOn, PortID(PortNumber))
 import Network.Socket (accept, withSocketsDo, Socket)
@@ -11,6 +12,7 @@ import System.IO
 import System.Environment
 import System.Random
 import Control.Monad
+import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Trans
 import Control.Exception
@@ -97,7 +99,8 @@ data ServerMessage = LoggedIn
                    | Prepare [(String, Float, Float, Float)]
                    | StartGame
                    | GameTick [(String, Float, Float, Float)]
-                   | PlayerDead String
+                   | PlayerDead String [(String, Int)]
+                   | EndGame
 
 makeJSONPacket :: String -> [(String, JSValue)] -> JSValue
 makeJSONPacket typ dat = JSObject $ toJSObject [("type", JSString $ toJSString typ),
@@ -126,8 +129,12 @@ instance JSON ServerMessage where
   showJSON StartGame = makeEmptyJSONPacket "game_started"
   showJSON (GameTick moves) = makeJSONPacket "game_tick"
                               [("moves", JSArray $ map positionToMove moves)]
-  showJSON (PlayerDead nick) = makeJSONPacket "player_dead"
-                               [("nick", JSString $ toJSString nick)]
+  showJSON (PlayerDead nick scoreBoard) = makeJSONPacket "player_dead"
+                               [("nick", JSString $ toJSString nick),
+                                ("scoreboard", JSArray $ map makeScore scoreBoard)]
+    where makeScore (nick, s) = JSObject $ toJSObject [("nick", JSString $ toJSString nick),
+                                                       ("score", JSRational False (fromIntegral s))]
+  showJSON EndGame = makeEmptyJSONPacket "game_ended"
   readJSON = undefined -- we won't need this
 
 type Position = (Float, Float)
@@ -214,11 +221,11 @@ updateCapacity id capacity = do
       r = rs Map.! id
   put $ e { rooms = Map.insert id (r { capacity = capacity }) rs }
 
-setGameActive id = do
+setGameStatus id act  = do
   e <- get
   let rs = rooms e
       r = rs Map.! id
-  put $ e { rooms = Map.insert id (r { isActive = True }) rs }
+  put $ e { rooms = Map.insert id (r { isActive = act }) rs }
 
 
 atomicallyState :: STM a -> ServerState a
@@ -239,6 +246,11 @@ getRoomsInfo :: ServerState [(Int, Int, [String])]
 getRoomsInfo = (map prepareInfo . Map.toList . rooms) `fmap` get
   where prepareInfo (id, Room { capacity = capacity,
                                 roomClients = nicks}) = (id, capacity, nicks)
+
+getScoreBoard :: Room -> ServerState [(String, Int)]
+getScoreBoard room = do
+  clients <- mapM getClient (roomClients room)
+  return $ map ((,) <$> nick <*> score) clients
 
 getRoomData :: Int -> ServerState [String]
 getRoomData id = (roomClients . (Map.! id) . rooms) `fmap` get
@@ -350,7 +362,7 @@ handleClientMessage (ClientSetsDirection nick change) = do
 handleClientMessage (DeferredStart id) = do
   Just r <- getRoom id
   sendToRoom r StartGame
-  setGameActive id
+  setGameStatus id True
 
 handleClientMessage Tick = do
   rooms <- rooms `fmap` get
@@ -368,7 +380,11 @@ handleRoom (rId, r@(Room { roomClients = cs,
   sendToRoom r (GameTick positions)
   Just r' <- getRoom rId
   updateRoom rId (r' { oldCollisionTree = tree })
-  where dphi = 0.7
+  newClients <- mapM getClient cs
+  when (length (filter alive clients) < 2) $ do
+    setGameStatus rId False
+    sendToRoom r' EndGame
+  where dphi = 0.9
         dp = 0.3
         dt = (fromRational (fromIntegral tickTime / 1000) :: Float)
         adjustPosition (client @(Client { nick = n,
@@ -382,8 +398,11 @@ handleRoom (rId, r@(Room { roomClients = cs,
           case segTreeIntersection segment oldTree of
             Just segment' -> do
               updateClient n (client { alive = False })
-              lift (putStrLn ("intersection " ++ show segment ++ show segment'))
-              sendToRoom r (PlayerDead n)
+              clients' <- mapM getClient cs
+              mapM_ givePoint (filter alive clients')
+              Just r' <- getRoom rId
+              scoreBoard <- getScoreBoard r'
+              sendToRoom r (PlayerDead n scoreBoard)
             Nothing -> do
               Just r' <- getRoom rId
               updateRoom rId (r' { collisionTree = addSegment (collisionTree r') segment})
@@ -393,10 +412,12 @@ handleRoom (rId, r@(Room { roomClients = cs,
           where mod2pi phi | phi < 0 = 2*pi - phi
                            | phi >= 2*pi = phi - 2*pi
                            | otherwise = phi
+                givePoint c@(Client { nick = n, score = s }) = do
+                  updateClient n (c { score = s+1})
 
 
 startGame rId serverChan = do
-  threadDelay 5
+  threadDelay (3*1000*1000)
   atomically $ writeTChan serverChan (DeferredStart rId)
   return ()
 

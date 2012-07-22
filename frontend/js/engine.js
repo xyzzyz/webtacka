@@ -340,7 +340,7 @@ function player( pos, dir) {
 	this.alive = true;
 }
 var dt = 0.3;
-var dphi = 0.7;
+var dphi = 0.9;
 
 player.prototype.step = function() {
 	if(!this.alive) return;

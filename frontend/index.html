@@ -39,10 +39,6 @@
     }
     #screen_game_end {
       display:none;
-      width: 660px;
-      height: 660px; 
-      font-size: 100px;
-      background: black;
     }
     </style>
 <script id="2d-vertex-shader" type="x-shader/x-vertex">
@@ -179,12 +175,14 @@ void main() {
       <div class="row-fluid">
         <div class="well span9">
             <canvas id="lesson01-canvas" style="border: none;" width="500" height="500"></canvas>
-            <div id="screen_game_end"><h1>End of turn!</h1></div>
+            <div id="screen_game_end" class="well"><h1>Round finished!</h1>
+              <a class="btn" id="screen_game_play_again_btn">Play another one!</a>
+            </div>
         </div>
         <div class="well span3">
           <script id="score_board_template" type="text/x-jsrender">
             <li nick="{{>nick}}" color1="{{>color1}}"
-            color2="{{>color2}}" class="score_board_entry"><div class="user_color"></div> {{>nick}} {{>score}}</li>
+            color2="{{>color2}}" class="score_board_entry"><div class="user_color"></div> {{>nick}}: {{>score}}</li>
           </script>
           <ul id="screen_room_score_board">
           <ul>

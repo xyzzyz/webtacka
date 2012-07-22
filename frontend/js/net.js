@@ -48,6 +48,10 @@ $(function(){
                     },
                     'player_dead': function(e){
                       player_dead(e.data.nick);
+                      update_scoreboard(e.data.scoreboard);
+                    },
+                    'game_ended': function(e){
+                      end_game();
                     },
                 }
             });
@@ -76,6 +80,10 @@ function send_create_room(capacity){
 }
 function send_start(){
     lsend('start');
+}
+
+function send_continue(){
+    lsend('continue');
 }
 
 function send_join(room_id){
