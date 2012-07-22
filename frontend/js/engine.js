@@ -40,7 +40,7 @@ var lastTick;
 var i=0;
 
 function init() {
- 	$('body').keydown(function(event) {
+	$('body').keydown(function(event) {
 		if(event.which == 37) {
 			players['jaro'].leftTurn = true;
 		} else if(event.which == 39) {
@@ -51,7 +51,7 @@ function init() {
 			players['Agnieszka'].rightTurn = true;
 		}
 	});
- 	$('body').keyup(function(event) {
+	$('body').keyup(function(event) {
 		if(event.which == 37) {
 			players['jaro'].leftTurn = false;
 		} else if(event.which == 39) {
@@ -144,7 +144,7 @@ function initBackground() {
            tick();
        }
 
-        backgroundTexture.image.src = "Seattle_pic.jpg";	
+        backgroundTexture.image.src = "img/Seattle_pic.jpg";	
 	gl.coordsBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, gl.coordsBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(coords), gl.STATIC_DRAW);
