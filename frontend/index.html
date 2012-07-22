@@ -6,12 +6,12 @@
     <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap.dark.min.css" />
     <script src="http://www.google.com/jsapi"></script>
     <script>google.load("jquery", "1.7")</script>
-    <script src="bootstrap/js/bootstrap.min.js"></script>
     <script src="http://jquery-json.googlecode.com/files/jquery.json-2.2.min.js"></script>
     <script src="http://jquery-websocket.googlecode.com/files/jquery.websocket-0.0.1.js"></script>
     <script src="js/jsviews/jsrender.js" type="text/javascript"></script>
     <script src="js/jsviews/jquery.observable.js" type="text/javascript"></script>
     <script src="js/jsviews/jquery.views.js" type="text/javascript"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
 
 
 
@@ -36,6 +36,13 @@
       height: 15px;
       display: inline-block;
       border:1px solid black;
+    }
+    #screen_game_end {
+      display:none;
+      width: 660px;
+      height: 550px; 
+      font-size: 100px;
+      background: black;
     }
     </style>
 <script id="2d-vertex-shader" type="x-shader/x-vertex">
@@ -172,7 +179,7 @@ void main() {
       <div class="row-fluid">
         <div class="well span9">
             <canvas id="lesson01-canvas" style="border: none;" width="660" height="500"></canvas>
-            <div id="screen_game_end" style="disply:none; witdth: 660px; height: 550px;"><h1>Game ended!</h1></div>
+            <div id="screen_game_end"><h1>End of turn!</h1></div>
         </div>
         <div class="well span3">
           <script id="score_board_template" type="text/x-jsrender">
