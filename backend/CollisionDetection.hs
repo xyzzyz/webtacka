@@ -72,7 +72,7 @@ addSegment (Node t1 t2 t3 t4 r) s =
 			else (Node t1 t2 t3 t4 r)
 
 buildTree :: Rectangle -> Tree
-buildTree r = if ((right r) - (left r)) < 20 then (Leaf [] r)
+buildTree r = if ((right r) - (left r)) < 0.1 then (Leaf [] r)
 	      else (Node (leftTop r) (rightTop r) (leftDown r) (rightDown r) r)
 
 leftTop :: Rectangle -> Tree
