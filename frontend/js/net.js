@@ -38,7 +38,7 @@ $(function(){
                         fail(e.data.error);
                     },
                     'prepare': function(e){
-                      prepare_game(e.data);
+                      prepare_game(e.data.people);
 
                     }
                 }
