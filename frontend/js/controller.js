@@ -94,6 +94,14 @@ function prepare_game(users){
     ui_render_score_board(config.users_list);
 };
 
+function update_scoreboard(board){
+  $.each(board, function(id, e){
+    config.users[e.nick].score =  e.score;
+  });
+  ui_render_score_board(config.users_list);
+
+}
+
 function game_started(){
     WebGLStart();
 }
@@ -119,4 +127,7 @@ function join_err(err){
 };
 function player_dead(nick){
   kill(nick);
+}
+function end_game(nick){
+  ui_show_end_game();
 }

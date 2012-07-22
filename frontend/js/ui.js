@@ -74,9 +74,15 @@ function ui_show_error(err) {
     $.render.error( [{'error': err}]));
 };
 
+function ui_show_end_game() {
+  $("#lesson01-canvas").hide();
+  $("#screen_game_end").show();
+}
+
 function ui_show_about() {
   $('#about_modal').modal();
 };
+
 
 $(function() {
     $("#hello").click(login);
