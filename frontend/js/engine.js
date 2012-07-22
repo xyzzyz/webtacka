@@ -1,12 +1,3 @@
-<!DOCTYPE HTML>
-<html>
-<head>
-<script type="text/javascript" src="webgl-utils.js"> </script>
-<script type="text/javascript" src="jquery-1.7.2.js"> </script>
-<script type="text/javascript" src="glMatrix-0.9.5.min.js"> </script>
-<script type="text/javascript">
-
-
     function getShader(gl, id) {
         var shaderScript = document.getElementById(id);
         if (!shaderScript) {
@@ -49,7 +40,7 @@ var lastTick;
 var i=0;
 
 function init() {
- 	$('body').keydown(function(event) {
+	$('body').keydown(function(event) {
 		if(event.which == 37) {
 			players['jaro'].leftTurn = true;
 		} else if(event.which == 39) {
@@ -60,7 +51,7 @@ function init() {
 			players['Agnieszka'].rightTurn = true;
 		}
 	});
- 	$('body').keyup(function(event) {
+	$('body').keyup(function(event) {
 		if(event.which == 37) {
 			players['jaro'].leftTurn = false;
 		} else if(event.which == 39) {
@@ -153,7 +144,7 @@ function initBackground() {
            tick();
        }
 
-        backgroundTexture.image.src = "Seattle_pic.jpg";	
+        backgroundTexture.image.src = "img/Seattle_pic.jpg";	
 	gl.coordsBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, gl.coordsBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(coords), gl.STATIC_DRAW);
@@ -374,56 +365,3 @@ function WebGLStart() {
 	init();
 	
 }
-</script>
-<script id="2d-vertex-shader" type="x-shader/x-vertex">
-attribute vec2 a_position;
-attribute vec4 a_color;
-uniform mat4 uPMatrix;
-varying vec4 v_color;
-
-void main() {
-  gl_Position = uPMatrix*vec4(a_position, 0, 1);
-  v_color = a_color;
-}
-</script>
-
-<script id="2d-fragment-shader" type="x-shader/x-fragment">
-precision mediump float;
-varying vec4 v_color;
-void main() {
-  gl_FragColor = v_color;
-}
-</script>
-
-<script id="background-vertex-shader" type="x-shader/x-vertex">
-  attribute vec2 a_position;
-  attribute vec2 a_coords;
-
-  uniform mat4 uPMatrix;
-
-  varying vec2 vTextureCoord;
-
-  void main(void) {
-    gl_Position = uPMatrix * vec4(a_position, 0.0, 1.0);
-    vTextureCoord = a_coords;
-  }
-</script>
-
-<script id="background-fragment-shader" type="x-shader/x-fragment">
-  precision mediump float;
-
-  varying vec2 vTextureCoord;
-
-  uniform sampler2D uSampler;
-
-  void main(void) {
-     gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
- //   gl_FragColor = vec4(vTextureCoord.s, vTextureCoord.t, 1.0, 1.0);
-  }
-</script>
-</head>
-<body onload="WebGLStart()">
-<canvas id="lesson01-canvas" style="border: none;" width="1000" height="500"></canvas>
-<img src="Seattle_pic.jpg" id="test"> </img>
-</body>
-</html>
