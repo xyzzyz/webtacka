@@ -27,9 +27,11 @@ $(function(){
                         update_room_list(e.data.rooms);
                     },
                     'joined': function(e){
+                        log(e);
                         joined(e.data.id, e.data.owner);
                     },
                     'room_data': function(e){
+                        log(e);
                         update_room(e.data.people);
                     },
                     'protocol_error': function(e){

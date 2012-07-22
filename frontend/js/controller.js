@@ -19,6 +19,14 @@ function logged_in() {
     ui_set_status("Fetching room list...");
     ui_show_screen("wait");
 }
+
+function refresh_room_list() {
+    send_get_rooms();
+    ui_set_status("Fetching room list...");
+}
+
+
+
 function update_room_list(rooms){
     ui_update_room_list(rooms);
     log(rooms);
