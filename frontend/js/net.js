@@ -48,6 +48,10 @@ $(function(){
                     },
                     'player_dead': function(e){
                       player_dead(e.data.nick);
+                      update_scoreboard(e.data.scoreboard);
+                    },
+                    'end_game': function(e){
+                      end_game();
                     },
                 }
             });
