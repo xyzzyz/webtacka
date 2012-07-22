@@ -149,7 +149,8 @@ function initBackground() {
            backgroundTexture = gl.createTexture();
            backgroundTexture.image = new Image();
            backgroundTexture.image.onload = function() {
-           handleLoadedTexture(backgroundTexture)
+           handleLoadedTexture(backgroundTexture);
+           tick();
        }
 
         backgroundTexture.image.src = "Seattle_pic.jpg";	
@@ -169,8 +170,8 @@ function drawBackground() {
 	gl.useProgram(gl.backgroundProgram);
 	gl.bindBuffer(gl.ARRAY_BUFFER, gl.backgroundBuffer);
 	gl.vertexAttribPointer(gl.positionLocation, 2, gl.FLOAT, false, 0, 0);
-	gl.bindBuffer(gl.ARRAY_BUFFER, gl.colorBuffer);
-	gl.vertexAttribPointer(gl.colorLocation, 4, gl.FLOAT, false, 0, 0);
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.coordsBuffer);
+	gl.vertexAttribPointer(gl.coordsLocation, 2, gl.FLOAT, false, 0, 0);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
@@ -371,7 +372,6 @@ function WebGLStart() {
 	}
 
 	init();
-	tick();
 	
 }
 </script>
@@ -417,11 +417,13 @@ void main() {
   uniform sampler2D uSampler;
 
   void main(void) {
-    gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+     gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+ //   gl_FragColor = vec4(vTextureCoord.s, vTextureCoord.t, 1.0, 1.0);
   }
 </script>
 </head>
 <body onload="WebGLStart()">
 <canvas id="lesson01-canvas" style="border: none;" width="1000" height="500"></canvas>
+<img src="Seattle_pic.jpg" id="test"> </img>
 </body>
 </html>
