@@ -15,8 +15,8 @@ data Segment = Segment { first :: Point
 
 segIntersection :: Segment -> Segment -> Bool
 segIntersection (Segment (Point x1 y1) (Point x2 y2)) (Segment (Point x3 y3) (Point x4 y4)) =
-		((x1-x2)*(y3-y2)-(y1-y2)*(x3-x4))*((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2)) < -0.1 &&
-		((x1-x3)*(y4-y3)-(y1-y3)*(x4-x3))*((x2-x3)*(y4-y3)-(y2-y3)*(x4-x3)) < -0.1 
+		((x1-x2)*(y3-y2)-(y1-y2)*(x3-x4))*((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2)) < -0.0000001 &&
+		((x1-x3)*(y4-y3)-(y1-y3)*(x4-x3))*((x2-x3)*(y4-y3)-(y2-y3)*(x4-x3)) < -0.0000001 
 
 data Tree = Leaf [Segment] Rectangle | Node Tree Tree Tree Tree Rectangle deriving Show
 
@@ -43,7 +43,7 @@ addSegment (Node t1 t2 t3 t4 r) s =
 			else (Node t1 t2 t3 t4 r)
 
 buildTree :: Rectangle -> Tree
-buildTree r = if ((right r) - (left r)) < 0.5 then (Leaf [] r)
+buildTree r = if ((right r) - (left r)) < 20 then (Leaf [] r)
 	      else (Node (leftTop r) (rightTop r) (leftDown r) (rightDown r) r)
 
 leftTop :: Rectangle -> Tree
