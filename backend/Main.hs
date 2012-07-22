@@ -19,6 +19,8 @@ import Control.Concurrent.STM
 
 import qualified Data.ByteString.Lazy.Char8 as B
 
+import CollisionDetection
+
 instance WebSocketsData String where
   fromLazyByteString = B.unpack
   toLazyByteString = B.pack
@@ -95,6 +97,7 @@ data ServerMessage = LoggedIn
                    | Prepare [(String, Float, Float, Float)]
                    | StartGame
                    | GameTick [(String, Float, Float, Float)]
+                   | PlayerDead String
 
 makeJSONPacket :: String -> [(String, JSValue)] -> JSValue
 makeJSONPacket typ dat = JSObject $ toJSObject [("type", JSString $ toJSString typ),
@@ -123,7 +126,8 @@ instance JSON ServerMessage where
   showJSON StartGame = makeEmptyJSONPacket "game_started"
   showJSON (GameTick moves) = makeJSONPacket "game_tick"
                               [("moves", JSArray $ map positionToMove moves)]
-
+  showJSON (PlayerDead nick) = makeJSONPacket "player_dead"
+                               [("nick", JSString $ toJSString nick)]
   readJSON = undefined -- we won't need this
 
 type Position = (Float, Float)
@@ -153,7 +157,8 @@ data Client = Client {
 data Room = Room {
   capacity :: Int,
   roomClients :: [String],
-  isActive :: Bool
+  isActive :: Bool,
+  collisionTree :: Tree
   }
 data ServerData = ServerData {
   roomCount :: Int,
@@ -171,7 +176,9 @@ createRoom nick capacity = do
                    rooms = rs,
                    clients = cs,
                    clientRooms = crs } = e
-  put $ e { rooms = Map.insert n (Room capacity [nick] False) rs,
+  put $ e { rooms = Map.insert n (Room capacity [nick] False
+                                  (buildTree (Rectangle (-1.0) 1.0 1.0 (-1.0))))
+                    rs,
             roomCount = n+1,
             clientRooms = Map.insert nick n crs}
   return n
@@ -185,6 +192,10 @@ joinRoom nick id = do
       crs = clientRooms e
   put $ e { rooms = Map.insert id (room { roomClients = nick : nicks}) r,
             clientRooms = Map.insert nick id crs }
+
+updateRoom id room = do
+  e <- get
+  put $ e { rooms = Map.insert id room (rooms e) }
 
 updateCapacity id capacity = do
   e <- get
@@ -332,13 +343,13 @@ handleClientMessage (DeferredStart id) = do
 
 handleClientMessage Tick = do
   rooms <- rooms `fmap` get
-  let activeRooms = Map.elems (Map.filter isActive rooms)
+  let activeRooms = Map.toList (Map.filter isActive rooms)
   mapM_ handleRoom activeRooms
   return ()
 
 
-handleRoom :: Room -> ServerState ()
-handleRoom (r@(Room { roomClients = cs })) = do
+handleRoom :: (Int, Room) -> ServerState ()
+handleRoom (rId, r@(Room { roomClients = cs, collisionTree = tree })) = do
   clients <- mapM getClient cs
   positions <- mapM adjustPosition clients
   sendToRoom r (GameTick positions)
@@ -352,6 +363,10 @@ handleRoom (r@(Room { roomClients = cs })) = do
           let phi' = mod2pi (phi + (changeToSign change)*dphi*pi*dt)
               x' = x + (sin phi) * dt * dp
               y' = y + (cos phi) * dt * dp
+              segment = Segment (Point x y) (Point x' y')
+          if segTreeIntersection segment tree
+            then sendToRoom r (PlayerDead n)
+            else updateRoom rId (r { collisionTree = addSegment tree segment})
           updateClient n (client { positions = (x', y'):pss,
                                    direction = phi'})
           return (n, x', y', phi')
