@@ -43,6 +43,9 @@ $(function(){
                     'game_started': function(e){
                       game_started();
                     },
+                    'game_tick': function(e){
+                      game_tick(e.data.moves);
+                    },
                 }
             });
 });
@@ -75,3 +78,7 @@ function send_start(){
 function send_join(room_id){
     lsend('join', { 'room': room_id});
 }
+function send_turn(direction){
+    lsend('client_move', { 'direction':direction});
+}
+

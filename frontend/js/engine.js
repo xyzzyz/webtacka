@@ -1,3 +1,9 @@
+/*
+ * Lot of graphic code is strongly based on Nehe tutorials (www.learningwebgl.com)
+ * 
+ * hsv2rgb from http://schinckel.net/2012/01/10/hsv-to-rgb-in-javascript/ by schinckel
+ */
+
 var players;
     function getShader(gl, id) {
         var shaderScript = document.getElementById(id);
@@ -23,8 +29,8 @@ var players;
             return null;
         }
 
-        gl.shaderSource(shader, str);
-        gl.compileShader(shader);
+	gl.shaderSource(shader, str);
+	gl.compileShader(shader);
 
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
             alert(gl.getShaderInfoLog(shader));
@@ -39,6 +45,7 @@ var positionLocation;
 var colorLocation;
 var lastTick;
 var i=0;
+var animation=false;
 
 function init() {
 	$('body').keydown(function(event) {
@@ -205,6 +212,12 @@ var hsv2rgb = function(hsv) {
   return rgb;
 };
 
+function rgbtostring(rgb) {
+   return '#' + rgb.map(function(x){
+       return ("0" + Math.round(x*255).toString(16)).slice(-2);
+   }).join('');
+}
+
 function pointFromServer(nick, point, direction) 
 {
 	players[nick].addPoint(point, direction);
@@ -272,7 +285,7 @@ function tick() {
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	drawBackground();
 	for(var xplr in players) {
-		players[xplr].step();
+		if(animation) players[xplr].step();
 		drawTrace(players[xplr]);
 	}
 }
@@ -296,12 +309,12 @@ function point(x,y)
 	this.y=y;
 };
 
-function player() {
+function player( pos, dir) {
 	this.color = new color(0,1,0,1);
-	this.position = new point(Math.random()*2-1, Math.random()*2-1);
-	this.direction = Math.random()*Math.PI*2;
+	this.position = pos;
+	this.direction = dir;
 	this.server_trace = [ new point(this.position.x, this.position.y)];
-	this.temp_trace = [];
+	this.temp_trace = [ new point(this.position.x, this.position.y) ];
 	this.leftTurn = false;
 	this.rightTurn = false;
 	this.min_hue = 0;
@@ -313,9 +326,11 @@ var dphi = 0.6;
 player.prototype.step = function() {
 	if(this.leftTurn) {
 		this.direction -= time*Math.PI*dphi;
+    control_turn('left');
 	}
 	if(this.rightTurn) {
 		this.direction += time*Math.PI*dphi;
+    control_turn('right');
 	}
 	this.position.x += time*Math.sin(this.direction)*dt;
 	this.position.y += time*Math.cos(this.direction)*dt;
@@ -332,9 +347,9 @@ player.prototype.addPoint = function(pnt, direction)
 
 function WebGLPrepare(users) {
 	players = new Array();
-  $.each(users, function(id, user){
-    players[user.nick] = new player();
-  });
+  	$.each(users, function(id, user){
+    		players[user.nick] = new player(new point(user.x, user.y), user.direction);
+  	});
 	var plrcnt = 0;
 	for(xplr in players){
 		plrcnt++;
@@ -343,17 +358,25 @@ function WebGLPrepare(users) {
 		var ah=0;
 		for(xplr in players) {
 			players[xplr].min_hue = ah;
-			players[xplr].max_hue = ah + 180/plrcnt;
+			players[xplr].max_hue = ah + 90/plrcnt;
 			ah += 360/plrcnt;
+			ui_set_user_color(xplr, rgbtostring(hsv2rgb(new hsv(players[xplr].min_hue, 1, 1))), 
+					rgbtostring(hsv2rgb(new hsv(players[xplr].max_hue, 1, 1))))
 		}
 	} else {
 		var ah=0;
 		for(xplr in players) {
 			players[xplr].min_hue = ah;
 			players[xplr].max_hue = ah;
+			ui_set_user_color(xplr, rgbtostring(hsv2rgb(new hsv(players[xplr].min_hue, 1, 1))), 
+					rgbtostring(hsv2rgb(new hsv(players[xplr].max_hue, 1, 1))))
 			ah += 360/plrcnt;
 		}
 	}
 
 	init();
+}
+
+function WebGLStart() {
+	animation = true;
 }

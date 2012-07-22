@@ -63,23 +63,45 @@ function start_game(){
     send_start();
 };
 
+function control_turn(direction){
+  send_turn(direction);
+}
+
 
 function prepare_game(users){
     if(typeof(config.users) == "undefined"){
-      config.users = users;
-      $.each(config.users, function(id, user){
-        user.score = 0;
-        user.color1 = "#FFBD24";
-        user.color2 = "#FFF700";
+      var newusers = {};
+      $.each(users, function(id, user){
+        newusers[user.nick] = {
+          nick: user.nick,
+          x: user.x,
+          y: user.y,
+          direction: user.direction,
+          score: 0,
+          color1: "#FFFFFF",
+          color2: "#000000"
+        };
+        log(newusers[user.nick]);
+        users[id] = newusers[user.nick];
+        log(newusers);
       });
+      config.users = newusers;
+      config.users_list = users;
     }
-    ui_render_score_board(config.users);
+    ui_render_score_board(config.users_list);
     ui_show_screen("game");
     WebGLPrepare(config.users);
+    ui_render_score_board(config.users_list);
 };
 
 function game_started(){
     WebGLStart();
+}
+
+function game_tick(moves){
+  $.each(moves, function(id, move){
+    pointFromServer(move.nick, new point(move.x, move.y), move.direction);
+  });
 }
 
 function fail(err){
