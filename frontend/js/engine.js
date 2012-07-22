@@ -234,6 +234,7 @@ function kill(nick) {
 
 function Pause() {
 	animation = false;
+	players = new Array();
 }
 
 function drawTrace(plr) {
@@ -364,6 +365,7 @@ player.prototype.addPoint = function(pnt, direction)
 }
 
 function WebGLPrepare(users) {
+	animation = false;
 	players = new Array();
   	$.each(users, function(id, user){
     		players[user.nick] = new player(new point(user.x, user.y), user.direction);
