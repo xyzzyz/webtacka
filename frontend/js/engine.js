@@ -331,7 +331,6 @@ player.prototype.addPoint = function(pnt, direction)
 }
 
 function WebGLPrepare(users) {
-  log(users);
 	players = new Array();
   $.each(users, function(id, user){
     players[user.nick] = new player();
