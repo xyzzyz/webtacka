@@ -76,7 +76,11 @@ function ui_show_error(err) {
 
 function ui_show_end_game() {
   $("#lesson01-canvas").hide();
+  $("#screen_game_play_again_btn").hide();
   $("#screen_game_end").show();
+  if(config.is_room_owner){
+    $("#screen_game_play_again_btn").show();
+  }
 }
 
 function ui_show_about() {
