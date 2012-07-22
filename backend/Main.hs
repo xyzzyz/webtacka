@@ -232,7 +232,7 @@ updateClient nick client = do
   put $ e { clients = Map.insert nick client (clients e) }
 
 tickTime :: Int
-tickTime = 100
+tickTime = 50
 
 main :: IO ()
 main = withSocketsDo $ do
@@ -309,8 +309,8 @@ handleClientMessage (ClientStarts nickname) = do
   lift (forkIO $ startGame rId sc)
   return ()
   where randomPosition = do
-          x <- randomRIO (-1.0, 1.0)
-          y <- randomRIO (-1.0, 1.0)
+          x <- randomRIO (-0.7, 0.7)
+          y <- randomRIO (-0.7, 0.7)
           direction <- randomRIO (0, 2*pi)
           return (x, y, direction)
         zipClientPos nick (x, y, direction) = do
@@ -347,14 +347,13 @@ handleRoom (r@(Room { roomClients = cs })) = do
         dt = (fromRational (fromIntegral tickTime / 1000) :: Float)
         adjustPosition (client @(Client { nick = n,
                                           positions = pss@((x, y):ps),
-                                          direction = phi, 
+                                          direction = phi,
                                           directionChange = change })) = do
           let phi' = mod2pi (phi + (changeToSign change)*dphi*pi*dt)
               x' = x + (sin phi) * dt * dp
-              y' = y + (sin phi) * dt * dp
+              y' = y + (cos phi) * dt * dp
           updateClient n (client { positions = (x', y'):pss,
-                                      direction = phi',
-                                      directionChange = None })
+                                   direction = phi'})
           return (n, x', y', phi')
           where mod2pi phi | phi < 0 = 2*pi - phi
                            | phi >= 2*pi = phi - 2*pi
