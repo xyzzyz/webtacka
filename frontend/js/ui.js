@@ -27,7 +27,7 @@ function ui_update_room_list(rooms){
 }
 function ui_update_room(people){
     $("#screen_room_id").html(config.current_room);
-    $("#screen_room_members").html();
+    $("#screen_room_members").html("");
     $.each(people, function(id,nick){
       $("#screen_room_members").append('<li>'+nick+'</li>');
     });
@@ -73,6 +73,10 @@ $(function() {
         var capacity = parseInt($("#create_room_capacity").val());
         create_room(capacity);
         $("#create_room_capacity").val("");
+    });
+
+    $("#room_list_refresh_btn").click(function(){
+      refresh_room_list();
     });
 
 

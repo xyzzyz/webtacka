@@ -19,6 +19,14 @@ function logged_in() {
     ui_set_status("Fetching room list...");
     ui_show_screen("wait");
 }
+
+function refresh_room_list() {
+    send_get_rooms();
+    ui_set_status("Fetching room list...");
+}
+
+
+
 function update_room_list(rooms){
     ui_update_room_list(rooms);
     log(rooms);
@@ -64,10 +72,13 @@ function prepare_game(users){
         user.color2 = "#FFF700";
       });
     }
-//    engine_prepare(users);
     ui_render_score_board(config.users);
     ui_show_screen("game");
+    WebGLStart();
 };
+
+//function start_game(){
+//}
 
 function fail(err){
     ui_set_failure(err);
