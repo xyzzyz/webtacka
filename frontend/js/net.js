@@ -50,7 +50,7 @@ $(function(){
                       player_dead(e.data.nick);
                       update_scoreboard(e.data.scoreboard);
                     },
-                    'end_game': function(e){
+                    'game_ended': function(e){
                       end_game();
                     },
                 }
