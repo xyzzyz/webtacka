@@ -25,9 +25,11 @@ instance WebSocketsData String where
 data ClientMessage = ClientConnected String (TChan ServerMessage)
                    | ClientAsksForRooms String
                    | ClientCreatesRoom String Int
+                   | ClientJoinsRoom String Int
 data ClientWireMessage = Hello String
                        | GetRooms
                        | CreateRoom Int
+                       | Join Int
 
 instance JSON ClientWireMessage where
   readJSON (JSObject obj) = do
@@ -36,6 +38,7 @@ instance JSON ClientWireMessage where
       "hello" -> Hello `fmap` getStringFromData "nick" dat
       "get_rooms" -> Ok GetRooms
       "create_room" -> CreateRoom `fmap` getIntFromData "capacity" dat
+      "join" -> Join `fmap` getIntFromData "room" dat
       s -> fail ("unknown message type: " ++ s)
   showJSON = undefined -- we won't need it
 
@@ -68,6 +71,9 @@ data ServerMessage = LoggedIn
                    | LoginErr String
                    | RoomsInfo [(Int, Int, [String])]
                    | Joined Int Bool
+                   | JoinErr String
+                   | RoomData [String]
+
 
 makeJSONPacket :: String -> [(String, JSValue)] -> JSValue
 makeJSONPacket typ dat = JSObject $ toJSObject [("type", JSString $ toJSString typ),
@@ -85,8 +91,11 @@ instance JSON ServerMessage where
             JSObject $ toJSObject [("id", JSRational False (fromIntegral id)),
                                    ("capacity", JSRational False (fromIntegral capacity)),
                                    ("nicks", JSArray $ map (JSString . toJSString) nicks)]
-  showJSON (Joined id isOwner) = makeJSONPacket "joined" [("id", JSRational False (fromIntegral id)),
-                                                          ("owner", JSBool isOwner)]
+  showJSON (Joined id isOwner) = makeJSONPacket "joined"
+                                 [("id", JSRational False (fromIntegral id)),
+                                  ("owner", JSBool isOwner)]
+  showJSON (RoomData nicks) = makeJSONPacket "room_data"
+                              [("people", JSArray $ map (JSString . toJSString) nicks)]
   readJSON = undefined -- we won't need this
 
 data Client = Client {
@@ -105,12 +114,14 @@ getRoomsInfo :: ServerState [(Int, Int, [String])]
 getRoomsInfo = (map prepareInfo . Map.toList . rooms) `fmap` get
   where prepareInfo (id, (capacity, clients)) = (id, capacity, map nick clients)
 
+getRoomData :: Int -> ServerState [String]
+getRoomData id = (map nick . snd . (Map.! id) . rooms) `fmap` get
 getClients :: ServerState (Map.Map String Client)
 getClients = clients `fmap` get
 
 hasClient nick = Map.member nick `fmap` getClients
-
-getClientChan nick = (chan . (Map.! nick)) `fmap` getClients
+getClient nick = (Map.! nick) `fmap` getClients
+getClientChan nick = chan `fmap` getClient nick
 
 createRoom nick capacity = do
   e <- get
@@ -120,8 +131,23 @@ createRoom nick capacity = do
   put $ e { rooms = Map.insert n (capacity, [cs Map.! nick]) rs, roomCount = n+1 }
   return n
 
+getRoom id = (Map.lookup id . rooms) `fmap` get
+joinRoom nick id = do
+  e <- get
+  client <- getClient nick
+  let r = rooms e
+      (capacity, nicks) = r Map.! id
+  put $ e { rooms = Map.adjust (fmap (client :)) id r }
 type ServerState = StateT ServerData IO
+
+atomicallyState :: STM a -> ServerState a
 atomicallyState = liftIO . atomically
+
+sendToClient :: TChan ServerMessage -> ServerMessage -> ServerState ()
+sendToClient c m = atomicallyState $ writeTChan c m
+
+sendToServer :: TChan ClientMessage -> ClientMessage -> IO ()
+sendToServer c m = atomically $ writeTChan c m
 
 main :: IO ()
 main = withSocketsDo $ do
@@ -146,21 +172,36 @@ handleClientMessage (ClientConnected nick clientChan) = do
   nickTaken <- hasClient nick
   if not nickTaken
     then addClient nick clientChan
-    else atomicallyState $ writeTChan clientChan (LoginErr "nick already exists")
+    else sendToClient clientChan (LoginErr "nick already exists")
     where addClient nick clientChan = do
             e <- get
             put $ e { clients = Map.insert nick (Client nick clientChan) (clients e) }
-            atomicallyState $ writeTChan clientChan LoggedIn
+            sendToClient clientChan LoggedIn
 
 handleClientMessage (ClientAsksForRooms nick) = do
   c <- getClientChan nick
   rooms <- getRoomsInfo
-  atomicallyState $ writeTChan c (RoomsInfo rooms)
+  sendToClient c (RoomsInfo rooms)
 
 handleClientMessage (ClientCreatesRoom nick capacity) = do
   n <- createRoom nick capacity
   c <- getClientChan nick
-  atomicallyState $ writeTChan c (Joined n True)
+  sendToClient c (Joined n True)
+  sendToClient c (RoomData ["nick"])
+
+handleClientMessage (ClientJoinsRoom nickname room) = do
+  r <- getRoom room
+  c <- getClientChan nickname
+  case r of
+    Nothing -> sendToClient c (JoinErr "room does not exist")
+    Just (capacity, clients) ->
+      if length clients < capacity
+      then do
+        joinRoom nickname room
+        sendToClient c $ Joined room False
+        Just (_, clients') <- getRoom room
+        mapM_ (flip sendToClient . RoomData . map nick $ clients') (map chan clients')
+      else sendToClient c (JoinErr "room full")
 
 newClient :: TChan ClientMessage -> Request -> WebSockets Hybi10 ()
 newClient chan rq = do
@@ -193,8 +234,9 @@ clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick = do
   clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick
   where getMessage = (Left `fmap` readTChan fromServerChan)
                      `orElse` (Right `fmap` readTChan fromNetworkChan)
-        handleNetworkMessage GetRooms = atomically $ writeTChan toServerChan (ClientAsksForRooms nick)
-        handleNetworkMessage (CreateRoom capacity) = atomically $ writeTChan toServerChan (ClientCreatesRoom nick capacity)
+        handleNetworkMessage GetRooms = sendToServer toServerChan (ClientAsksForRooms nick)
+        handleNetworkMessage (CreateRoom capacity) = sendToServer toServerChan (ClientCreatesRoom nick capacity)
+        handleNetworkMessage (Join id) = sendToServer toServerChan (ClientJoinsRoom nick id)
         handleNetworkMessage _ = return ()
 
 clientNetworkLoop networkChan = do
