@@ -104,6 +104,7 @@ function initGL() {
 
 	gl.enable(gl.LINE_SMOOTH);
 	gl.lineWidth(3);
+	gl.pointSize(3);
 
         gl.viewport(0.0, 0.0, canvas.width, canvas.height);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -227,7 +228,7 @@ function pointFromServer(nick, point, direction)
 	players[nick].addPoint(point, direction);
 };
 
-function Kill(nick) {
+function kill(nick) {
 	players[nick].alive = false;
 }
 
@@ -284,7 +285,10 @@ function drawTrace(plr) {
 	buffer.numItems = n;
 	gl.vertexAttribPointer(gl.colorLocation, 4, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(gl.colorLocation);
-	gl.drawArrays(gl.LINE_STRIP, 0, n);
+	if(animation)
+		gl.drawArrays(gl.LINE_STRIP, 0, n);
+	else 
+		gl.drawArrays(gl.POINTS, 0, n);
 }
 
 function tick() {
