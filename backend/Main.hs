@@ -28,6 +28,7 @@ data ClientMessage = ClientConnected String (TChan ServerMessage)
                    | ClientCreatesRoom String Int
                    | ClientJoinsRoom String Int
                    | ClientStarts String
+                   | ClientSetsDirection String DirectionChange
                    | DeferredStart Int
                    | Tick
 
@@ -36,6 +37,7 @@ data ClientWireMessage = Hello String
                        | CreateRoom Int
                        | Join Int
                        | Start
+                       | ClientMove DirectionChange
                        deriving (Show)
 
 instance JSON ClientWireMessage where
@@ -47,6 +49,7 @@ instance JSON ClientWireMessage where
       "create_room" -> CreateRoom `fmap` getIntFromData "capacity" dat
       "join" -> Join `fmap` getIntFromData "room" dat
       "start" -> Ok Start
+      "client_move" -> ClientMove `fmap` getDirectionChangeFromData dat
       s -> fail ("unknown message type: " ++ s)
   showJSON = undefined -- we won't need it
 
@@ -65,6 +68,13 @@ getIntFromData key dat = do
   case dat of
     JSRational _ r -> return (floor r)
     _ -> fail "expected int"
+
+getDirectionChangeFromData dat = do
+  c <- getStringFromData "direction" dat
+  case c of
+    "left" -> return ChangeLeft
+    "right" -> return ChangeRight
+    _ -> fail "wrong direction"
 
 getMessageTypeAndData obj = case (lookup "type" obj, lookup "data" obj) of
   (Just (JSString jstyp), Just (JSObject obj)) ->
@@ -125,7 +135,7 @@ positionToMove (nick, x, y, direction) =
 
 
 data DirectionChange = None | ChangeLeft | ChangeRight
-
+                     deriving (Show)
 changeToSign :: DirectionChange -> Float
 changeToSign None = 0.0
 changeToSign ChangeLeft = -1.0
@@ -309,6 +319,11 @@ handleClientMessage (ClientStarts nickname) = do
                                       direction = direction })
           return (nick, x, y, direction)
 
+handleClientMessage (ClientSetsDirection nick change) = do
+  client <- getClient nick
+  updateClient nick (client { directionChange = change })
+
+
 handleClientMessage (DeferredStart id) = do
   Just r <- getRoom id
   sendToRoom r StartGame
@@ -319,7 +334,6 @@ handleClientMessage Tick = do
   let activeRooms = Map.elems (Map.filter isActive rooms)
   mapM_ handleRoom activeRooms
   return ()
-
 
 
 handleRoom :: Room -> ServerState ()
@@ -386,6 +400,7 @@ clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick = do
         handleNetworkMessage (CreateRoom capacity) = sendToServer toServerChan (ClientCreatesRoom nick capacity)
         handleNetworkMessage (Join id) = sendToServer toServerChan (ClientJoinsRoom nick id)
         handleNetworkMessage Start = sendToServer toServerChan (ClientStarts nick)
+        handleNetworkMessage (ClientMove change) = sendToServer toServerChan (ClientSetsDirection nick change)
         handleNetworkMessage _ = return ()
 
 clientNetworkLoop networkChan = do
