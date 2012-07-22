@@ -17,6 +17,9 @@ $(function(){
 });
 
 function ui_update_room_list(rooms){
+    $.each(rooms, function(id, room){
+      room.people = JSON.stringify(room.people);
+    });
     $( "#room_table tbody" ).html(
         $.render.room_entry( rooms )
     );
