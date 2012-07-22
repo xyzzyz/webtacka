@@ -14,14 +14,14 @@ data Segment = Segment { first :: Point
 
 segIntersection :: Segment -> Segment -> Bool
 segIntersection (Segment (Point x1 y1) (Point x2 y2)) (Segment (Point x3 y3) (Point x4 y4)) =
-		((x1-x2)*(y3-y2)-(y1-y2)(x3-x4))*((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2))<0 &&
+		((x1-x2)*(y3-y2)-(y1-y2)*(x3-x4))*((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2))<0 &&
 		((x1-x3)*(y4-y3)-(y1-y3)*(x4-x3))*((x2-x3)*(y4-y3)-(y2-y3)*(x4-x3))<0 
 
-data Tree tree = Leaf [Segment] Rectangle | Node Tree Tree Tree Tree Rectangle
+data Tree = Leaf [Segment] Rectangle | Node Tree Tree Tree Tree Rectangle
 
 segTreeIntersection :: Segment -> Tree -> Bool
 segTreeIntersection s (Leaf [] r) = False
-segTreeIntersection s (Leaf l:ls r) =
+segTreeIntersection s (Leaf (l:ls) r) =
    			if segRectIntersection s r then  
 				segIntersection s l || (segTreeIntersection s (Leaf ls r))
 			else False
@@ -40,9 +40,9 @@ addSegment (Node t1 t2 t3 t4 r) s =
 				(Node (addSegment t1 s) (addSegment t2 s) (addSegment t3 s) (addSegment t4 s) r) 	
 			else (Node t1 t2 t3 t4 r)
 
-buildTree :: Rectange -> Tree
+buildTree :: Rectangle -> Tree
 buildTree r = if (right r - left r) < 0.1 then (Leaf [] r)
-	      ielse (Node (leftTop r) (rightTop r) (leftDown r) (rightDown r) r)
+	      else (Node (leftTop r) (rightTop r) (leftDown r) (rightDown r) r)
 
 leftTop :: Rectangle -> Tree
 leftTop (Rectangle l r t d) = 
@@ -62,9 +62,10 @@ leftDown (Rectangle l r t d) =
 rightDown :: Rectangle -> Tree
 rightDown (Rectangle l r t d) =
 	let rect = (Rectangle ((l+r)/2) r ((d+t)/2) d)
+		in buildTree rect
 
 segRectIntersection :: Segment -> Rectangle -> Bool
-segRectIntersection ((Segment f s) @ seg) ((Rectangle l r t d) @ rect) =
+segRectIntersection (seg @ (Segment f s)) (rect @ (Rectangle l r t d)) =
 	if (isPointInRect f rect) then True
 	else let (s1, s2, s3, s4) = (rectToSegs rect) in (segIntersection seg s1 || segIntersection seg s2 || segIntersection seg s3 || segIntersection seg s4) 
   	
