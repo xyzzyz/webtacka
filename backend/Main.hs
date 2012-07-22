@@ -73,7 +73,7 @@ getMessageTypeAndData obj = case (lookup "type" obj, lookup "data" obj) of
   (_, _) -> Error "data not found"
 
 wireMessageFromString :: String -> Result ClientWireMessage
-wireMessageFromString str = decode str >>= readJSON 
+wireMessageFromString str = decode str >>= readJSON
 
 data ServerMessage = LoggedIn
                    | LoginErr String
@@ -83,6 +83,7 @@ data ServerMessage = LoggedIn
                    | RoomData [String]
                    | Prepare [(String, Float, Float, Float)]
                    | StartGame
+                   | GameTick [(String, Float, Float, Float)]
 
 makeJSONPacket :: String -> [(String, JSValue)] -> JSValue
 makeJSONPacket typ dat = JSObject $ toJSObject [("type", JSString $ toJSString typ),
@@ -107,22 +108,35 @@ instance JSON ServerMessage where
   showJSON (RoomData nicks) = makeJSONPacket "room_data"
                               [("people", JSArray $ map (JSString . toJSString) nicks)]
   showJSON (Prepare startData) = makeJSONPacket "prepare"
-                                 [("people", JSArray $ map toStartInfo startData)]
-    where toStartInfo (nick, x, y, direction) =
-            JSObject $ toJSObject [("nick", JSString $ toJSString nick),
-                                   ("x", JSRational False $ toRational x),
-                                   ("y", JSRational False $ toRational y),
-                                   ("direction", JSRational False $ toRational direction)]
+                                 [("people", JSArray $ map positionToMove startData)]
   showJSON StartGame = makeEmptyJSONPacket "game_started"
+  showJSON (GameTick moves) = makeJSONPacket "game_tick"
+                              [("moves", JSArray $ map positionToMove moves)]
+
   readJSON = undefined -- we won't need this
 
-type Position = (Float, Float, Float)
+type Position = (Float, Float)
+
+positionToMove (nick, x, y, direction) =
+  JSObject $ toJSObject [("nick", JSString $ toJSString nick),
+                         ("x", JSRational False $ toRational x),
+                         ("y", JSRational False $ toRational y),
+                         ("direction", JSRational False $ toRational direction)]
+
+
+data DirectionChange = None | ChangeLeft | ChangeRight
+
+changeToSign :: DirectionChange -> Float
+changeToSign None = 0.0
+changeToSign ChangeLeft = -1.0
+changeToSign ChangeRight = 1.0
 
 data Client = Client {
   nick :: String,
   chan :: TChan ServerMessage,
   positions :: [Position],
-  nextDirection :: Float
+  direction :: Float,
+  directionChange :: DirectionChange
 }
 
 data Room = Room {
@@ -138,20 +152,7 @@ data ServerData = ServerData {
   serverChan :: TChan ClientMessage
 }
 
-getRoomsInfo :: ServerState [(Int, Int, [String])]
-getRoomsInfo = (map prepareInfo . Map.toList . rooms) `fmap` get
-  where prepareInfo (id, Room { capacity = capacity,
-                                roomClients = nicks}) = (id, capacity, nicks)
-
-getRoomData :: Int -> ServerState [String]
-getRoomData id = (roomClients . (Map.! id) . rooms) `fmap` get
-getClients :: ServerState (Map.Map String Client)
-getClients = clients `fmap` get
-
-hasClient nick = Map.member nick `fmap` getClients
-getClient nick = (Map.! nick) `fmap` getClients
-getClientChan nick = chan `fmap` getClient nick
-getClientRoom nick = ((Map.! nick) . clientRooms) `fmap` get
+type ServerState = StateT ServerData IO
 
 createRoom nick capacity = do
   e <- get
@@ -186,7 +187,6 @@ setGameActive id = do
       r = rs Map.! id
   put $ e { rooms = Map.insert id (r { isActive = True }) rs }
 
-type ServerState = StateT ServerData IO
 
 atomicallyState :: STM a -> ServerState a
 atomicallyState = liftIO . atomically
@@ -202,12 +202,33 @@ sendToRoom room msg = do
 sendToServer :: TChan ClientMessage -> ClientMessage -> IO ()
 sendToServer c m = atomically $ writeTChan c m
 
+getRoomsInfo :: ServerState [(Int, Int, [String])]
+getRoomsInfo = (map prepareInfo . Map.toList . rooms) `fmap` get
+  where prepareInfo (id, Room { capacity = capacity,
+                                roomClients = nicks}) = (id, capacity, nicks)
+
+getRoomData :: Int -> ServerState [String]
+getRoomData id = (roomClients . (Map.! id) . rooms) `fmap` get
+getClients :: ServerState (Map.Map String Client)
+getClients = clients `fmap` get
+
+hasClient nick = Map.member nick `fmap` getClients
+getClient nick = (Map.! nick) `fmap` getClients
+getClientChan nick = chan `fmap` getClient nick
+getClientRoom nick = ((Map.! nick) . clientRooms) `fmap` get
+updateClient nick client = do
+  e <- get
+  put $ e { clients = Map.insert nick client (clients e) }
+
+tickTime :: Int
+tickTime = 50
+
 main :: IO ()
 main = withSocketsDo $ do
   servSock <- listenOn $ PortNumber 9160
   chan <- atomically newTChan
   forkIO $ acceptLoop servSock chan
-  forkIO $ tickLoop 50 chan
+  forkIO $ tickLoop tickTime chan
   evalStateT (mainLoop chan) (ServerData 0 Map.empty Map.empty Map.empty chan)
 
 tickLoop :: Int -> TChan ClientMessage -> IO ()
@@ -235,7 +256,7 @@ handleClientMessage (ClientConnected nick clientChan) = do
     else sendToClient clientChan (LoginErr "nick already exists")
     where addClient nick clientChan = do
             e <- get
-            put $ e { clients = Map.insert nick (Client nick clientChan [] 0.0) (clients e) }
+            put $ e { clients = Map.insert nick (Client nick clientChan [] 0.0 None) (clients e) }
             sendToClient clientChan LoggedIn
 
 handleClientMessage (ClientAsksForRooms nick) = do
@@ -271,7 +292,8 @@ handleClientMessage (ClientStarts nickname) = do
   let nicks = roomClients r
   updateCapacity rId (length nicks)
   poss <- lift (replicateM (length nicks) randomPosition)
-  sendToRoom r (Prepare $ zipWith zipClientPos nicks poss)
+  positions <- zipWithM zipClientPos nicks poss
+  sendToRoom r (Prepare positions)
   sc <- serverChan `fmap` get
   lift (forkIO $ startGame rId sc)
   return ()
@@ -280,7 +302,12 @@ handleClientMessage (ClientStarts nickname) = do
           y <- randomRIO (-1.0, 1.0)
           direction <- randomRIO (0, 2*pi)
           return (x, y, direction)
-        zipClientPos nick (x, y, direction) = (nick, x, y, direction)
+        zipClientPos nick (x, y, direction) = do
+          client <- getClient nick
+          let ps = positions client
+          updateClient nick (client { positions = (x, y):ps,
+                                      direction = direction })
+          return (nick, x, y, direction)
 
 handleClientMessage (DeferredStart id) = do
   Just r <- getRoom id
@@ -293,7 +320,31 @@ handleClientMessage Tick = do
   mapM_ handleRoom activeRooms
   return ()
 
-handleRoom (Room { roomClients = cs }) = return ()
+
+
+handleRoom :: Room -> ServerState ()
+handleRoom (r@(Room { roomClients = cs })) = do
+  clients <- mapM getClient cs
+  positions <- mapM adjustPosition clients
+  sendToRoom r (GameTick positions)
+  where dphi = 0.6
+        dp = 0.3
+        dt = (fromRational (fromIntegral tickTime / 1000) :: Float)
+        adjustPosition (client @(Client { nick = n,
+                                          positions = pss@((x, y):ps),
+                                          direction = phi, 
+                                          directionChange = change })) = do
+          let phi' = mod2pi (phi + (changeToSign change)*dphi*pi*dt)
+              x' = x + (sin phi) * dt * dp
+              y' = y + (sin phi) * dt * dp
+          updateClient n (client { positions = (x', y'):pss,
+                                      direction = phi',
+                                      directionChange = None })
+          return (n, x', y', phi')
+          where mod2pi phi | phi < 0 = 2*pi - phi
+                           | phi >= 2*pi = phi - 2*pi
+                           | otherwise = phi
+
 
 startGame rId serverChan = do
   threadDelay 5
