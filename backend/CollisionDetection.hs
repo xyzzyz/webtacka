@@ -13,10 +13,15 @@ data Segment = Segment { first :: Point
                        , second :: Point
                        } deriving (Show, Eq)
 
+eps = 0.0001
+
+check l1 l2 = if abs(l1) > eps && abs(l2) > eps then l1*l2 < 0
+	else False
+
 segIntersection :: Segment -> Segment -> Bool
 segIntersection (Segment (Point x1 y1) (Point x2 y2)) (Segment (Point x3 y3) (Point x4 y4)) =
-		((x1-x2)*(y3-y2)-(y1-y2)*(x3-x4))*((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2)) < -0.0000001 &&
-		((x1-x3)*(y4-y3)-(y1-y3)*(x4-x3))*((x2-x3)*(y4-y3)-(y2-y3)*(x4-x3)) < -0.0000001 
+		(check ((x1-x2)*(y3-y2)-(y1-y2)*(x3-x4)) ((x1-x2)*(y4-y2)-(y1-y2)*(x4-x2)))  &&
+		(check ((x1-x3)*(y4-y3)-(y1-y3)*(x4-x3)) ((x2-x3)*(y4-y3)-(y2-y3)*(x4-x3)))
 
 data Tree = Leaf [Segment] Rectangle | Node Tree Tree Tree Tree Rectangle deriving Show
 
