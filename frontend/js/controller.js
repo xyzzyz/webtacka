@@ -136,4 +136,5 @@ function player_dead(nick){
 }
 function end_game(nick){
   ui_show_end_game();
+  Pause();
 }

@@ -38,9 +38,11 @@ $(function(){
                         fail(e.data.error);
                     },
                     'prepare': function(e){
+                      log(e);
                       prepare_game(e.data.people);
                     },
                     'game_started': function(e){
+                      log(e);
                       game_started();
                     },
                     'game_tick': function(e){
