@@ -8,7 +8,8 @@ $(function() {
 
 
 function login(){
-    send_hello($("#nick").val());
+    config.nick = $("#nick").val();
+    send_hello(config.nick);
     ui_set_status("Logging in.");
     ui_show_screen("wait");
 };
@@ -74,7 +75,7 @@ function prepare_game(users){
     }
     ui_render_score_board(config.users);
     ui_show_screen("game");
-    WebGLStart();
+    WebGLPrepare(config.users);
 };
 
 //function start_game(){

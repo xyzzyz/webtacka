@@ -65,6 +65,9 @@ function ui_show_error(err) {
     $.render.error( [{'error': err}]));
 };
 
+function ui_show_about() {
+  $('#about_modal').modal();
+};
 
 $(function() {
     $("#hello").click(login);
@@ -78,6 +81,7 @@ $(function() {
     $("#room_list_refresh_btn").click(function(){
       refresh_room_list();
     });
+    $("#about_btn").click(ui_show_about);
 
 
 
