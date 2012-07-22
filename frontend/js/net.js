@@ -46,6 +46,7 @@ $(function(){
                       game_started();
                     },
                     'game_tick': function(e){
+                      log(e.data.moves);
                       game_tick(e.data.moves);
                     },
                     'player_dead': function(e){
@@ -55,6 +56,9 @@ $(function(){
                     'game_ended': function(e){
                       log(e);
                       end_game();
+                    },
+                    'parted': function(e){
+                        logged_in();
                     },
                 }
             });
@@ -96,3 +100,6 @@ function send_turn(direction){
     lsend('client_move', { 'direction':direction});
 }
 
+function send_part(){
+    lsend('part');
+}

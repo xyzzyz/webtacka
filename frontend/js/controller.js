@@ -14,6 +14,11 @@ function login(){
     ui_show_screen("wait");
 };
 
+function part_room(){
+    send_part();
+    ui_set_status("Please wait.");
+    ui_show_screen("wait");
+};
 
 function logged_in() {
     send_get_rooms();
