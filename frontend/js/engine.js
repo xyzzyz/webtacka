@@ -67,7 +67,7 @@ function initGL() {
 	});
 
 	canvas = document.getElementById("lesson01-canvas");
-        gl = canvas.getContext("experimental-webgl");
+        gl = canvas.getContext("experimental-webgl", { antialias: true});
         gl.viewportWidth = canvas.width;
         gl.viewportHeight = canvas.height;
 
