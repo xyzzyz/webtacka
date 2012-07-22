@@ -82,6 +82,10 @@ function send_start(){
     lsend('start');
 }
 
+function send_continue(){
+    lsend('continue');
+}
+
 function send_join(room_id){
     lsend('join', { 'room': room_id});
 }

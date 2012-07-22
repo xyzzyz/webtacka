@@ -63,6 +63,11 @@ function start_game(){
     send_start();
 };
 
+function start_game(){
+    ui_set_status("Starting game...");
+    ui_show_screen("wait");
+    send_continue();
+};
 function control_turn(direction){
   send_turn(direction);
 }

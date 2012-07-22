@@ -76,7 +76,11 @@ function ui_show_error(err) {
 
 function ui_show_end_game() {
   $("#lesson01-canvas").hide();
+  $("#screen_game_play_again_btn").hide();
   $("#screen_game_end").show();
+  if(config.is_room_owner){
+    $("#screen_game_play_again_btn").show();
+  }
 }
 
 function ui_show_about() {
@@ -87,7 +91,7 @@ function ui_show_about() {
 $(function() {
     $("#hello").click(login);
     $("#screen_room_btn_start").click(start_game);
-    $("#screen_game_play_again_btn").click(start_game);
+    $("#screen_game_play_again_btn").click(continue_game);
     $("#create_room_btn").click(function(){
         var capacity = parseInt($("#create_room_capacity").val());
         create_room(capacity);
