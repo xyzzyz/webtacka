@@ -51,6 +51,7 @@ $(function(){
                       update_scoreboard(e.data.scoreboard);
                     },
                     'game_ended': function(e){
+                      log(e);
                       end_game();
                     },
                 }
