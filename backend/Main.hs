@@ -28,6 +28,8 @@ data ClientMessage = ClientConnected String (TChan ServerMessage)
                    | ClientCreatesRoom String Int
                    | ClientJoinsRoom String Int
                    | ClientStarts String
+                   | DeferredStart Int
+                   | Tick
 
 data ClientWireMessage = Hello String
                        | GetRooms
@@ -80,7 +82,7 @@ data ServerMessage = LoggedIn
                    | JoinErr String
                    | RoomData [String]
                    | Prepare [(String, Float, Float, Float)]
-
+                   | StartGame
 
 makeJSONPacket :: String -> [(String, JSValue)] -> JSValue
 makeJSONPacket typ dat = JSObject $ toJSObject [("type", JSString $ toJSString typ),
@@ -106,10 +108,12 @@ instance JSON ServerMessage where
                               [("people", JSArray $ map (JSString . toJSString) nicks)]
   showJSON (Prepare startData) = makeJSONPacket "prepare"
                                  [("people", JSArray $ map toStartInfo startData)]
-    where toStartInfo (nick, x, y, direction) = JSObject $ toJSObject [("nick", JSString $ toJSString nick),
-                                                                       ("x", JSRational False $ toRational x),
-                                                                       ("y", JSRational False $ toRational y),
-                                                                       ("direction", JSRational False $ toRational direction)]
+    where toStartInfo (nick, x, y, direction) =
+            JSObject $ toJSObject [("nick", JSString $ toJSString nick),
+                                   ("x", JSRational False $ toRational x),
+                                   ("y", JSRational False $ toRational y),
+                                   ("direction", JSRational False $ toRational direction)]
+  showJSON StartGame = makeEmptyJSONPacket "start"
   readJSON = undefined -- we won't need this
 
 data Client = Client {
@@ -119,13 +123,15 @@ data Client = Client {
 
 data Room = Room {
   capacity :: Int,
-  roomClients :: [Client]
+  roomClients :: [Client],
+  isActive :: Bool
   }
 data ServerData = ServerData {
   roomCount :: Int,
   rooms :: Map.Map Int Room,
   clients :: Map.Map String Client,
-  clientRooms :: Map.Map String Int
+  clientRooms :: Map.Map String Int,
+  serverChan :: TChan ClientMessage
 }
 
 getRoomsInfo :: ServerState [(Int, Int, [String])]
@@ -149,8 +155,8 @@ createRoom nick capacity = do
                    rooms = rs,
                    clients = cs,
                    clientRooms = crs } = e
-  put $ e { rooms = Map.insert n (Room capacity [cs Map.! nick]) rs,
-            roomCount = n+1, 
+  put $ e { rooms = Map.insert n (Room capacity [cs Map.! nick] False) rs,
+            roomCount = n+1,
             clientRooms = Map.insert nick n crs}
   return n
 
@@ -171,6 +177,12 @@ updateCapacity id capacity = do
       r = rs Map.! id
   put $ e { rooms = Map.insert id (r { capacity = capacity }) rs }
 
+setGameActive id = do
+  e <- get
+  let rs = rooms e
+      r = rs Map.! id
+  put $ e { rooms = Map.insert id (r { isActive = True }) rs }
+
 type ServerState = StateT ServerData IO
 
 atomicallyState :: STM a -> ServerState a
@@ -190,7 +202,14 @@ main = withSocketsDo $ do
   servSock <- listenOn $ PortNumber 9160
   chan <- atomically newTChan
   forkIO $ acceptLoop servSock chan
-  evalStateT (mainLoop chan) (ServerData 0 Map.empty Map.empty Map.empty)
+  forkIO $ tickLoop 50 chan
+  evalStateT (mainLoop chan) (ServerData 0 Map.empty Map.empty Map.empty chan)
+
+tickLoop :: Int -> TChan ClientMessage -> IO ()
+tickLoop tick chan = do
+  threadDelay (1000*tick)
+  atomically $ writeTChan chan Tick
+  tickLoop tick chan
 
 acceptLoop :: Socket -> TChan ClientMessage -> IO ()
 acceptLoop serverSock chan = do
@@ -247,12 +266,30 @@ handleClientMessage (ClientStarts nickname) = do
   updateCapacity rId (length clients)
   poss <- lift (replicateM (length clients) randomPosition)
   sendToRoom r (Prepare $ zipWith zipClientPos clients poss)
+  sc <- serverChan `fmap` get
+  lift (forkIO $ startGame rId sc)
+  return ()
   where randomPosition = do
           x <- randomRIO (-1.0, 1.0)
           y <- randomRIO (-1.0, 1.0)
           direction <- randomRIO (0, 2*pi)
           return (x, y, direction)
         zipClientPos client (x, y, direction) = (nick client, x, y, direction)
+
+handleClientMessage (DeferredStart id) = do
+  Just r <- getRoom id
+  sendToRoom r StartGame
+  setGameActive id
+
+handleClientMessage Tick = do
+  rooms <- rooms `fmap` get
+  let activeRooms = Map.elems (Map.filter isActive rooms)
+  return ()
+
+startGame rId serverChan = do
+  threadDelay 5
+  atomically $ writeTChan serverChan (DeferredStart rId)
+  return ()
 
 newClient :: TChan ClientMessage -> Request -> WebSockets Hybi10 ()
 newClient chan rq = do
