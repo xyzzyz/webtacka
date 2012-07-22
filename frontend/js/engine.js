@@ -47,7 +47,7 @@ var lastTick;
 var i=0;
 var animation=false;
 
-function init() {
+function initGL() {
 	$('body').keydown(function(event) {
 		if(event.which == 37) {
 			players[config.nick].leftTurn = true;
@@ -223,6 +223,10 @@ function pointFromServer(nick, point, direction)
 	players[nick].addPoint(point, direction);
 };
 
+function Pause() {
+	animation = false;
+}
+
 function drawTrace(plr) {
 	var n = plr.server_trace.length + plr.temp_trace.length;
 	var vertices = new Array(2*n);
@@ -373,9 +377,12 @@ function WebGLPrepare(users) {
 			ah += 360/plrcnt;
 		}
 	}
-
-	init();
 }
+
+function Destroy() {
+	players = new Array()
+}
+
 
 function WebGLStart() {
 	animation = true;
