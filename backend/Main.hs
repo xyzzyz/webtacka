@@ -8,6 +8,7 @@ import Network.WebSockets
 import System.IO
 import System.Environment
 import Control.Monad
+import Control.Monad.State
 import Control.Monad.Trans
 import Control.Exception
 import Control.Concurrent
@@ -16,14 +17,21 @@ import Control.Concurrent.STM
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-type Client = Sink Hybi10
+type ClientMessage = ()
+type Client = TChan ClientMessage
+type Room = [Client]
+data ServerData = ServerData {
+  rooms :: [Room]
+}
+
+type ServerState = StateT ServerData IO
 
 main :: IO ()
 main = withSocketsDo $ do
   servSock <- listenOn $ PortNumber 9160
   acceptChan <- atomically newTChan
   forkIO $ acceptLoop servSock acceptChan
-  mainLoop servSock acceptChan
+  evalStateT (mainLoop servSock acceptChan) (ServerData [])
 
 acceptLoop :: Socket -> TChan Socket -> IO ()
 acceptLoop serverSock acceptChan = do
@@ -31,10 +39,10 @@ acceptLoop serverSock acceptChan = do
   atomically $ writeTChan acceptChan clientSock
   acceptLoop serverSock acceptChan
 
-mainLoop :: Socket -> TChan Socket -> IO ()
+mainLoop :: Socket -> TChan Socket -> ServerState ()
 mainLoop serverSock acceptChan = do
-  clientSock <- atomically $ readTChan acceptChan
-  forkIO $ runWithSocket clientSock application
+  clientSock <- lift (atomically $ readTChan acceptChan)
+  lift (forkIO $ runWithSocket clientSock application)
   mainLoop serverSock acceptChan
 
 
