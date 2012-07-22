@@ -39,8 +39,10 @@ $(function(){
                     },
                     'prepare': function(e){
                       prepare_game(e.data.people);
-
-                    }
+                    },
+                    'game_started': function(e){
+                      start_game();
+                    },
                 }
             });
 });

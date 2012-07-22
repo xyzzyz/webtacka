@@ -77,6 +77,9 @@ function prepare_game(users){
     WebGLStart();
 };
 
+//function start_game(){
+//}
+
 function fail(err){
     ui_set_failure(err);
     ui_show_screen("error");
