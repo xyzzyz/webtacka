@@ -9,6 +9,23 @@ data Rectangle = Rectangle { left :: Float
 
 data Point = Point Float Float deriving (Show, Eq)
 
+pminus :: Point -> Point -> Point
+pminus (Point x1 y1) (Point x2 y2) = Point (x1 - x2) (y1 - y2)
+
+pmul :: Point -> Point -> Float
+pmul (Point x1 y1) (Point x2 y2) = x1*y2 - x2*y1
+
+myIntersection :: Segment -> Segment -> Bool
+myIntersection (Segment p1 p2) (Segment p3 p4) = 
+	(mycheck p1 p2 p3 p4) && (mycheck p3 p4 p1 p2)
+
+mycheck :: Point -> Point -> Point -> Point -> Bool
+mycheck p1 p2 p3 p4 = let 
+       v1 = p2 `pminus` p1
+       v2 = p3 `pminus` p1
+       v3 = p4 `pminus` p1
+  in check (v1 `pmul` v2) (v1 `pmul` v3)
+
 data Segment = Segment { first :: Point
                        , second :: Point
                        } deriving (Show, Eq)
@@ -35,7 +52,7 @@ segTreeIntersection :: Segment -> Tree -> Maybe Segment
 segTreeIntersection s (Leaf [] r) = Nothing
 segTreeIntersection s (Leaf (l:ls) r) =
    			if (segRectIntersection s r) then  
-				(if (segIntersection s l) then Just l
+				(if (myIntersection s l) then Just l
 				else segTreeIntersection s (Leaf ls r))
 			else Nothing
 segTreeIntersection s (Node t1 t2 t3 t4 r) = 
@@ -81,7 +98,7 @@ rightDown (Rectangle l r t d) =
 segRectIntersection :: Segment -> Rectangle -> Bool
 segRectIntersection (seg @ (Segment f s)) (rect @ (Rectangle l r t d)) =
 	if (isPointInRect f rect) then True
-	else let (s1, s2, s3, s4) = (rectToSegs rect) in ((segIntersection seg s1) || (segIntersection seg s2) || (segIntersection seg s3) || (segIntersection seg s4)) 
+	else let (s1, s2, s3, s4) = (rectToSegs rect) in ((myIntersection seg s1) || (myIntersection seg s2) || (myIntersection seg s3) || (myIntersection seg s4)) 
   	
 isPointInRect :: Point -> Rectangle -> Bool
 isPointInRect (Point x y) (Rectangle l r t d) = (x>=l && x<=r && y<=t && y>=d) 
