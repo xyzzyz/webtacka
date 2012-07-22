@@ -366,7 +366,7 @@ function WebGLPrepare(users) {
 		var ah=0;
 		for(xplr in players) {
 			players[xplr].min_hue = ah;
-			players[xplr].max_hue = ah + 90/plrcnt;
+			players[xplr].max_hue = ah + 120/plrcnt;
 			ah += 360/plrcnt;
 			ui_set_user_color(xplr, rgbtostring(hsv2rgb(new hsv(players[xplr].min_hue, 1, 1))), 
 					rgbtostring(hsv2rgb(new hsv(players[xplr].max_hue, 1, 1))))
