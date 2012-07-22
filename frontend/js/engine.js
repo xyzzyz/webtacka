@@ -326,9 +326,11 @@ var dphi = 0.6;
 player.prototype.step = function() {
 	if(this.leftTurn) {
 		this.direction -= time*Math.PI*dphi;
+    control_turn('left');
 	}
 	if(this.rightTurn) {
 		this.direction += time*Math.PI*dphi;
+    control_turn('right');
 	}
 	this.position.x += time*Math.sin(this.direction)*dt;
 	this.position.y += time*Math.cos(this.direction)*dt;
