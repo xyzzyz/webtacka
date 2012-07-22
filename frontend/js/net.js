@@ -46,7 +46,6 @@ $(function(){
                       game_started();
                     },
                     'game_tick': function(e){
-                      log(e.data.moves);
                       game_tick(e.data.moves);
                     },
                     'player_dead': function(e){
