@@ -101,6 +101,7 @@ instance JSON ServerMessage where
   showJSON (Joined id isOwner) = makeJSONPacket "joined"
                                  [("id", JSRational False (fromIntegral id)),
                                   ("owner", JSBool isOwner)]
+  showJSON (JoinErr str) = makeJSONPacket "join_err" [("error", JSString $ toJSString str)]
   showJSON (RoomData nicks) = makeJSONPacket "room_data"
                               [("people", JSArray $ map (JSString . toJSString) nicks)]
   showJSON (Prepare startData) = makeJSONPacket "prepare"
