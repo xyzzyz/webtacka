@@ -113,17 +113,21 @@ instance JSON ServerMessage where
                                    ("x", JSRational False $ toRational x),
                                    ("y", JSRational False $ toRational y),
                                    ("direction", JSRational False $ toRational direction)]
-  showJSON StartGame = makeEmptyJSONPacket "start"
+  showJSON StartGame = makeEmptyJSONPacket "game_started"
   readJSON = undefined -- we won't need this
+
+type Position = (Float, Float, Float)
 
 data Client = Client {
   nick :: String,
-  chan :: TChan ServerMessage
+  chan :: TChan ServerMessage,
+  positions :: [Position],
+  nextDirection :: Float
 }
 
 data Room = Room {
   capacity :: Int,
-  roomClients :: [Client],
+  roomClients :: [String],
   isActive :: Bool
   }
 data ServerData = ServerData {
@@ -137,10 +141,10 @@ data ServerData = ServerData {
 getRoomsInfo :: ServerState [(Int, Int, [String])]
 getRoomsInfo = (map prepareInfo . Map.toList . rooms) `fmap` get
   where prepareInfo (id, Room { capacity = capacity,
-                                roomClients = clients}) =(id, capacity, map nick clients)
+                                roomClients = nicks}) = (id, capacity, nicks)
 
 getRoomData :: Int -> ServerState [String]
-getRoomData id = (map nick . roomClients . (Map.! id) . rooms) `fmap` get
+getRoomData id = (roomClients . (Map.! id) . rooms) `fmap` get
 getClients :: ServerState (Map.Map String Client)
 getClients = clients `fmap` get
 
@@ -155,7 +159,7 @@ createRoom nick capacity = do
                    rooms = rs,
                    clients = cs,
                    clientRooms = crs } = e
-  put $ e { rooms = Map.insert n (Room capacity [cs Map.! nick] False) rs,
+  put $ e { rooms = Map.insert n (Room capacity [nick] False) rs,
             roomCount = n+1,
             clientRooms = Map.insert nick n crs}
   return n
@@ -163,12 +167,11 @@ createRoom nick capacity = do
 getRoom id = (Map.lookup id . rooms) `fmap` get
 joinRoom nick id = do
   e <- get
-  client <- getClient nick
   let r = rooms e
       room = r Map.! id
-      clients = roomClients room
+      nicks = roomClients room
       crs = clientRooms e
-  put $ e { rooms = Map.insert id (room { roomClients = client : clients}) r,
+  put $ e { rooms = Map.insert id (room { roomClients = nick : nicks}) r,
             clientRooms = Map.insert nick id crs }
 
 updateCapacity id capacity = do
@@ -192,7 +195,9 @@ sendToClient :: TChan ServerMessage -> ServerMessage -> ServerState ()
 sendToClient c m = atomicallyState $ writeTChan c m
 
 sendToRoom :: Room -> ServerMessage -> ServerState ()
-sendToRoom room msg = mapM_ ((flip sendToClient $ msg) . chan) (roomClients room)
+sendToRoom room msg = do
+  clients <- mapM getClient (roomClients room)
+  mapM_ ((flip sendToClient $ msg) . chan) clients
 
 sendToServer :: TChan ClientMessage -> ClientMessage -> IO ()
 sendToServer c m = atomically $ writeTChan c m
@@ -230,7 +235,7 @@ handleClientMessage (ClientConnected nick clientChan) = do
     else sendToClient clientChan (LoginErr "nick already exists")
     where addClient nick clientChan = do
             e <- get
-            put $ e { clients = Map.insert nick (Client nick clientChan) (clients e) }
+            put $ e { clients = Map.insert nick (Client nick clientChan [] 0.0) (clients e) }
             sendToClient clientChan LoggedIn
 
 handleClientMessage (ClientAsksForRooms nick) = do
@@ -254,18 +259,19 @@ handleClientMessage (ClientJoinsRoom nickname room) = do
       then do
         joinRoom nickname room
         sendToClient c $ Joined room False
-        Just (Room { roomClients = clients'}) <- getRoom room
-        mapM_ (flip sendToClient . RoomData . map nick $ clients') (map chan clients')
+        Just (Room { roomClients = nicks}) <- getRoom room
+        clients' <- mapM getClient nicks
+        mapM_ (flip sendToClient . RoomData $ nicks) (map chan clients')
       else sendToClient c (JoinErr "room full")
 
 handleClientMessage (ClientStarts nickname) = do
   rId <- getClientRoom nickname
   c <- getClientChan nickname
   Just r <- getRoom rId
-  let clients = roomClients r
-  updateCapacity rId (length clients)
-  poss <- lift (replicateM (length clients) randomPosition)
-  sendToRoom r (Prepare $ zipWith zipClientPos clients poss)
+  let nicks = roomClients r
+  updateCapacity rId (length nicks)
+  poss <- lift (replicateM (length nicks) randomPosition)
+  sendToRoom r (Prepare $ zipWith zipClientPos nicks poss)
   sc <- serverChan `fmap` get
   lift (forkIO $ startGame rId sc)
   return ()
@@ -274,7 +280,7 @@ handleClientMessage (ClientStarts nickname) = do
           y <- randomRIO (-1.0, 1.0)
           direction <- randomRIO (0, 2*pi)
           return (x, y, direction)
-        zipClientPos client (x, y, direction) = (nick client, x, y, direction)
+        zipClientPos nick (x, y, direction) = (nick, x, y, direction)
 
 handleClientMessage (DeferredStart id) = do
   Just r <- getRoom id
@@ -284,7 +290,10 @@ handleClientMessage (DeferredStart id) = do
 handleClientMessage Tick = do
   rooms <- rooms `fmap` get
   let activeRooms = Map.elems (Map.filter isActive rooms)
+  mapM_ handleRoom activeRooms
   return ()
+
+handleRoom (Room { roomClients = cs }) = return ()
 
 startGame rId serverChan = do
   threadDelay 5
