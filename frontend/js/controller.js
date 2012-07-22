@@ -72,9 +72,9 @@ function prepare_game(users){
         user.color2 = "#FFF700";
       });
     }
-//    engine_prepare(users);
     ui_render_score_board(config.users);
     ui_show_screen("game");
+    WebGLStart();
 };
 
 function fail(err){
