@@ -23,6 +23,28 @@ instance WebSocketsData String where
   toLazyByteString = B.pack
 
 data ClientMessage = ConnectMessage String (TChan ServerMessage)
+data ClientWireMessage = HelloMessage String
+
+instance JSON ClientWireMessage where
+  readJSON (JSObject obj) = do
+    (typ, dat) <- getMessageTypeAndData (fromJSObject obj)
+    case typ of
+      "hello" -> HelloMessage `fmap` getStringFromData "nick" dat
+  showJSON = undefined -- we won't need it
+
+getStringFromData key dat = case lookup key dat of
+  Just (JSString dat) -> return (fromJSString dat)
+  Just _ -> fail "expected string"
+  _ -> fail "key not found"
+
+getMessageTypeAndData obj = case (lookup "type" obj, lookup "data" obj) of
+  (Just (JSString jstyp), Just (JSObject obj)) ->
+    Ok (fromJSString jstyp, (fromJSObject obj))
+  (Nothing, _) -> Error "type not found"
+  (_, _) -> Error "data not found"
+
+wireMessageFromString :: String -> Result ClientWireMessage
+wireMessageFromString str = decode str >>= readJSON 
 
 data ServerMessage = LoggedIn
                    | LoginErr String
@@ -92,43 +114,28 @@ handleClientMessage (ConnectMessage nick clientChan) = do
             atomicallyState $ writeTChan clientChan LoggedIn
 
 
+
 newClient :: TChan ClientMessage -> Request -> WebSockets Hybi10 ()
 newClient chan rq = do
   liftIO $ putStrLn "Ktos przylazl"
   acceptRequest rq
   msg <- (receiveData :: WebSockets Hybi10 String)
-  case decode msg :: Result JSValue of
+  case wireMessageFromString msg of
+    Ok (HelloMessage nick) -> handleHelloMessage nick
     Error str -> liftIO $ putStrLn ("JSON error: " ++ str)
-    Ok (JSObject obj) -> handleHelloMessage (fromJSObject obj)
+    _ -> liftIO $ putStrLn ("Unexpected message")
   return ()
-  where handleHelloMessage lst = case parseHelloMessage lst of
-          Left err -> liftIO $ putStrLn ("Protocol error: " ++ err)
-          Right nick -> do
-            clientChan <- liftIO . atomically $ newTChan
-            liftIO $ putStrLn (nick ++ " connected")
-            liftIO . atomically $ writeTChan chan (ConnectMessage nick clientChan)
-            clientLoop chan clientChan
+  where handleHelloMessage nick = do
+          clientChan <- liftIO . atomically $ newTChan
+          liftIO $ putStrLn (nick ++ " connected")
+          liftIO . atomically $ writeTChan chan (ConnectMessage nick clientChan)
+          clientLoop chan clientChan
 
 clientLoop :: TChan ClientMessage -> TChan ServerMessage -> WebSockets Hybi10 ()
 clientLoop serverChan clientChan = do
   msg <- liftIO . atomically $ readTChan clientChan
   handleServerMsg msg
 
-handleServerMsg LoggedIn = do
-  send $ textData (encode LoggedIn)
+handleServerMsg msg = do
+  send $ textData (encode msg)
 
-parseHelloMessage :: [(String, JSValue)] -> Either String String
-parseHelloMessage obj = do
-  dat <- checkMessageType "hello" obj
-  case lookup "nick" dat of
-    Just (JSString jsnick) -> return (fromJSString jsnick)
-    Nothing -> fail "Nick not found"
-
-
-checkMessageType typ obj = case (lookup "type" obj, lookup "data" obj) of
-  (Just (JSString jstyp), Just (JSObject obj)) -> let typ' = fromJSString jstyp in
-    if typ == typ'
-    then return (fromJSObject obj)
-    else fail ("type mismatch, got " ++ typ' ++ " but expected " ++ typ)
-  (Nothing, _) -> fail "type not found"
-  (_, _) -> fail "data not found"
