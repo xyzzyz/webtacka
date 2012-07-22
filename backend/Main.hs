@@ -151,7 +151,8 @@ data Client = Client {
   chan :: TChan ServerMessage,
   positions :: [Position],
   direction :: Float,
-  directionChange :: DirectionChange
+  directionChange :: DirectionChange,
+  alive :: Bool
 }
 
 data Room = Room {
@@ -278,7 +279,7 @@ handleClientMessage (ClientConnected nick clientChan) = do
     else sendToClient clientChan (LoginErr "nick already exists")
     where addClient nick clientChan = do
             e <- get
-            put $ e { clients = Map.insert nick (Client nick clientChan [] 0.0 None) (clients e) }
+            put $ e { clients = Map.insert nick (Client nick clientChan [] 0.0 None True) (clients e) }
             sendToClient clientChan LoggedIn
 
 handleClientMessage (ClientAsksForRooms nick) = do
@@ -351,7 +352,7 @@ handleClientMessage Tick = do
 handleRoom :: (Int, Room) -> ServerState ()
 handleRoom (rId, r@(Room { roomClients = cs, collisionTree = tree })) = do
   clients <- mapM getClient cs
-  positions <- mapM adjustPosition clients
+  positions <- mapM adjustPosition (filter alive clients)
   sendToRoom r (GameTick positions)
   where dphi = 0.6
         dp = 0.3
@@ -365,10 +366,12 @@ handleRoom (rId, r@(Room { roomClients = cs, collisionTree = tree })) = do
               y' = y + (cos phi) * dt * dp
               segment = Segment (Point x y) (Point x' y')
           if segTreeIntersection segment tree
-            then sendToRoom r (PlayerDead n)
-            else updateRoom rId (r { collisionTree = addSegment tree segment})
-          updateClient n (client { positions = (x', y'):pss,
-                                   direction = phi'})
+            then do
+            updateClient n (client { alive = False })
+            sendToRoom r (PlayerDead n)
+            else do updateRoom rId (r { collisionTree = addSegment tree segment})
+                    updateClient n (client { positions = (x', y'):pss,
+                                             direction = phi'})
           return (n, x', y', phi')
           where mod2pi phi | phi < 0 = 2*pi - phi
                            | phi >= 2*pi = phi - 2*pi
@@ -407,7 +410,7 @@ clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick = do
   action <- atomically getMessage
   case action of
     Left server -> sendSink toNetworkSink . textData . encode . showJSON $ server
-    Right network -> putStrLn (show network) >> handleNetworkMessage network
+    Right network -> handleNetworkMessage network
   clientLoop fromServerChan toServerChan fromNetworkChan toNetworkSink nick
   where getMessage = (Left `fmap` readTChan fromServerChan)
                      `orElse` (Right `fmap` readTChan fromNetworkChan)
