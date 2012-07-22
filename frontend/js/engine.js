@@ -309,10 +309,10 @@ function point(x,y)
 	this.y=y;
 };
 
-function player() {
+function player( pos, dir) {
 	this.color = new color(0,1,0,1);
-	this.position = new point(Math.random()*2-1, Math.random()*2-1);
-	this.direction = Math.random()*Math.PI*2;
+	this.position = pos;
+	this.direction = dir;
 	this.server_trace = [ new point(this.position.x, this.position.y)];
 	this.temp_trace = [ new point(this.position.x, this.position.y) ];
 	this.leftTurn = false;
@@ -346,7 +346,7 @@ player.prototype.addPoint = function(pnt, direction)
 function WebGLPrepare(users) {
 	players = new Array();
   	$.each(users, function(id, user){
-    		players[user.nick] = new player();
+    		players[user.nick] = new player(new point(user.x, user.y), user.direction);
   	});
 	var plrcnt = 0;
 	for(xplr in players){
@@ -358,7 +358,7 @@ function WebGLPrepare(users) {
 			players[xplr].min_hue = ah;
 			players[xplr].max_hue = ah + 180/plrcnt;
 			ah += 360/plrcnt;
-			ui_set_user_color(xplr, rgbtostring(hsvtorgb(new hsv(players[xplr].min_hue, 1, 1))), 
+			ui_set_user_color(xplr, rgbtostring(hsv2rgb(new hsv(players[xplr].min_hue, 1, 1))), 
 					rgbtostring(hsvtorgb(new hsv(players[xplr].max_hue, 1, 1))))
 		}
 	} else {
