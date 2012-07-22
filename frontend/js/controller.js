@@ -63,6 +63,10 @@ function start_game(){
     send_start();
 };
 
+function control_turn(direction){
+  send_turn(direction);
+}
+
 
 function prepare_game(users){
     if(typeof(config.users) == "undefined"){
@@ -92,6 +96,12 @@ function prepare_game(users){
 
 function game_started(){
     WebGLStart();
+}
+
+function game_tick(moves){
+  $.each(moves, function(id, move){
+    pointFromServer(move.nick, new point(move.x, move.y), move.direction);
+  });
 }
 
 function fail(err){
