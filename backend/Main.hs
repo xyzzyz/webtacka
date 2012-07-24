@@ -55,7 +55,7 @@ instance JSON ClientWireMessage where
       "create_room" -> CreateRoom `fmap` getIntFromData "capacity" dat
       "join" -> Join `fmap` getIntFromData "room" dat
       "start" -> Ok Start
-      "continue" -> Ok Start
+      "continue" -> Ok Continue
       "client_move" -> ClientMove `fmap` getDirectionChangeFromData dat
       s -> fail ("unknown message type: " ++ s)
   showJSON = undefined -- we won't need it
@@ -190,7 +190,7 @@ initSegments = [Segment (Point (-1.0) (-1.0)) (Point (-1.0) 1.0),
                 Segment (Point 1.0 (-1.0)) (Point 1.0 1.0)]
 
 initTree :: Tree
-initTree = foldl addSegment (buildTree (Rectangle (-1.0) 1.0 1.0 (-1.0))) initSegments
+initTree = foldl addSegment (buildTree (Rectangle (-1.73) 1.73 1.73 (-1.73))) initSegments
 
 createRoom nick capacity = do
   e <- get
