@@ -416,6 +416,10 @@ handleRoom (rId, r@(Room { roomClients = cs,
               segment = Segment (Point x y) (Point x' y')
           case segTreeIntersection segment oldTree of
             Just segment' -> do
+              client @(Client { nick = n,
+                                positions = pss@((x, y):ps),
+                                direction = phi,
+                                directionChange = change }) <- getClient n
               updateClient n (client { alive = False })
               clients' <- mapM getClient cs
               mapM_ givePoint (filter alive clients')
@@ -423,6 +427,10 @@ handleRoom (rId, r@(Room { roomClients = cs,
               scoreBoard <- getScoreBoard r'
               sendToRoom r (PlayerDead n scoreBoard)
             Nothing -> do
+              client @(Client { nick = n,
+                                positions = pss@((x, y):ps),
+                                direction = phi,
+                                directionChange = change }) <- getClient n
               Just r' <- getRoom rId
               updateRoom rId (r' { collisionTree = addSegment (collisionTree r') segment})
               updateClient n (client { positions = (x', y'):pss,
