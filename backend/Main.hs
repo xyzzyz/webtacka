@@ -385,7 +385,8 @@ newGame rId = do
           client <- getClient nick
           let ps = positions client
           updateClient nick (client { positions = (x, y):ps,
-                                      direction = direction })
+                                      direction = direction,
+                                      directionChange = None })
           return (nick, x, y, direction)
 
 
