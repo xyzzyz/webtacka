@@ -375,7 +375,7 @@ function WebGLPrepare(users) {
 	for(xplr in players){
 		plrcnt++;
 	}
-	if(plrcnt < 4){
+	if(plrcnt < 5){
 		var ah=0;
 		for(xplr in players) {
 			players[xplr].min_hue = ah;
