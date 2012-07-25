@@ -432,6 +432,7 @@ handleRoom (rId, r@(Room { roomClients = cs,
                            | phi >= 2*pi = phi - 2*pi
                            | otherwise = phi
                 givePoint c@(Client { nick = n, score = s }) = do
+                  liftIO $ putStrLn $ n ++ " dostal punkt"
                   updateClient n (c { score = s+1})
 
 
