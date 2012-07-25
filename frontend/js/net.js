@@ -49,6 +49,7 @@ $(function(){
                       game_tick(e.data.moves);
                     },
                     'player_dead': function(e){
+                      log(e);
                       player_dead(e.data.nick);
                       update_scoreboard(e.data.scoreboard);
                     },
@@ -68,7 +69,9 @@ function lsend(type, params){
       params = {};
     }
 
-    console.log('Sending ' + type +' message - data: '+JSON.stringify(params));
+    if(config.debug){
+      console.log('Sending ' + type +' message - data: '+JSON.stringify(params));
+    }
     ws.send(type, params);
 }
 
