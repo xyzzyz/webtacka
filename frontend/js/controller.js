@@ -1,5 +1,7 @@
 function log(x){
+  if(config.debug){
     console.log(JSON.stringify(x));
+  }
 };
 
 $(function() {
